@@ -1,0 +1,1556 @@
+:root {
+  --azul-oceano: #0b6e91;
+  --azul-oceano-escuro: #084f68;
+  --coral: #ff7a59;
+  --coral-escuro: #e85f3c;
+  --cinza-borda: #dbe4ea;
+  --cinza-texto: #5c6b7a;
+}
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  background: linear-gradient(135deg, var(--azul-oceano), var(--azul-oceano-escuro));
+  color: white;
+  padding: 24px 32px;
+}
+
+.app-header-conteudo {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.btn-voltar {
+  background-color: rgba(255, 255, 255, 0.15);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.subtitulo {
+  margin: 4px 0 0;
+  opacity: 0.85;
+  font-size: 0.95rem;
+}
+
+.app-main {
+  flex: 1;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 20px 40px;
+}
+
+.app-footer {
+  text-align: center;
+  padding: 16px;
+  color: var(--cinza-texto);
+  font-size: 0.85rem;
+  border-top: 1px solid var(--cinza-borda);
+}
+
+/* Barra de ações */
+.barra-acoes {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.campo-busca {
+  flex: 1;
+  min-width: 220px;
+  padding: 10px 14px;
+  border: 1px solid var(--cinza-borda);
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+
+.campo-busca:focus {
+  outline: none;
+  border-color: var(--azul-oceano);
+}
+
+/* Botões */
+.btn {
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: none;
+  font-size: 0.95rem;
+  font-weight: 600;
+  transition: opacity 0.15s ease;
+}
+
+.btn:hover {
+  opacity: 0.9;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primario {
+  background-color: var(--coral);
+  color: white;
+}
+
+.btn-primario:hover {
+  background-color: var(--coral-escuro);
+}
+
+.btn-secundario {
+  background-color: white;
+  color: var(--azul-oceano);
+  border: 1px solid var(--azul-oceano);
+}
+
+.btn-perigo {
+  background-color: white;
+  color: #c0392b;
+  border: 1px solid #c0392b;
+}
+
+/* Grid de clientes */
+.clientes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.cliente-card {
+  background: white;
+  border: 1px solid var(--cinza-borda);
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.cliente-card-topo h3 {
+  margin: 0;
+  color: var(--azul-oceano-escuro);
+}
+
+.cliente-card-info p {
+  margin: 4px 0;
+  font-size: 0.9rem;
+  color: var(--cinza-texto);
+}
+
+.cliente-card-info strong {
+  color: #1f2d3d;
+}
+
+.cliente-card-info .observacoes {
+  font-style: italic;
+}
+
+.cliente-card-acoes {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.mensagem-vazia {
+  text-align: center;
+  color: var(--cinza-texto);
+  padding: 40px 0;
+}
+
+/* Formulário */
+.cliente-form {
+  background: white;
+  border: 1px solid var(--cinza-borda);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.cliente-form h2 {
+  margin-top: 0;
+  color: var(--azul-oceano-escuro);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.9rem;
+  color: var(--cinza-texto);
+}
+
+.campo-largo {
+  grid-column: 1 / -1;
+}
+
+.form-grid input,
+.form-grid textarea {
+  padding: 9px 12px;
+  border: 1px solid var(--cinza-borda);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  color: #1f2d3d;
+  resize: vertical;
+}
+
+.form-grid input:focus,
+.form-grid textarea:focus {
+  outline: none;
+  border-color: var(--azul-oceano);
+}
+
+.form-acoes {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.form-erro {
+  background-color: #fdecea;
+  color: #c0392b;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 600px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Tela inicial (menu) */
+.home-intro {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.home-intro h2 {
+  margin: 0 0 6px;
+  color: var(--azul-oceano-escuro);
+}
+
+.home-intro p {
+  margin: 0;
+  color: var(--cinza-texto);
+}
+
+.menu-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 18px;
+}
+
+.menu-card {
+  background: white;
+  border: 1px solid var(--cinza-borda);
+  border-radius: 14px;
+  padding: 26px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.menu-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--azul-oceano);
+  box-shadow: 0 6px 16px rgba(11, 110, 145, 0.15);
+}
+
+.menu-card-icone {
+  font-size: 2.2rem;
+}
+
+.menu-card-titulo {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--azul-oceano-escuro);
+}
+
+.menu-card-descricao {
+  font-size: 0.85rem;
+  color: var(--cinza-texto);
+  line-height: 1.4;
+}
+
+/* Mensagem de sucesso */
+.form-sucesso {
+  background-color: #e6f6ec;
+  color: #1e7a45;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  margin: 0 auto 16px;
+  max-width: 700px;
+}
+
+/* Telas em construção */
+.em-construcao {
+  text-align: center;
+  background: white;
+  border: 1px solid var(--cinza-borda);
+  border-radius: 12px;
+  padding: 48px 24px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.em-construcao-icone {
+  font-size: 2.5rem;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.em-construcao h2 {
+  margin: 0 0 8px;
+  color: var(--azul-oceano-escuro);
+}
+
+.em-construcao p {
+  margin: 0 0 6px;
+  color: var(--cinza-texto);
+}
+
+.em-construcao-nota {
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+/* ===== Cotações ===== */
+
+/* Abas de status */
+.abas {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  border-bottom: 2px solid var(--cinza-borda);
+}
+
+.aba {
+  background: none;
+  border: none;
+  padding: 10px 16px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--cinza-texto);
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.aba-ativa {
+  color: var(--azul-oceano);
+  border-bottom-color: var(--azul-oceano);
+}
+
+.aba-contador {
+  background: var(--cinza-borda);
+  color: var(--cinza-texto);
+  border-radius: 10px;
+  padding: 1px 8px;
+  font-size: 0.78rem;
+}
+
+.aba-ativa .aba-contador {
+  background: var(--azul-oceano);
+  color: white;
+}
+
+/* Cards de cotação */
+.cotacoes-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cotacao-card {
+  background: white;
+  border: 1px solid var(--cinza-borda);
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.cotacao-card-topo {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.cotacao-card-topo h3 {
+  margin: 0;
+  color: var(--azul-oceano-escuro);
+  font-size: 1.15rem;
+}
+
+.cotacao-cliente {
+  margin: 2px 0 0;
+  color: var(--cinza-texto);
+  font-size: 0.9rem;
+}
+
+.cotacao-card-datas {
+  text-align: right;
+  font-size: 0.85rem;
+  color: var(--cinza-texto);
+}
+
+.cotacao-card-datas p {
+  margin: 2px 0;
+}
+
+.etiqueta-dias {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.dias-ok { background: #e6f6ec; color: #1e7a45; }
+.dias-alerta { background: #fff4e0; color: #a86400; }
+.dias-grave { background: #fdecea; color: #c0392b; }
+
+/* Resumo financeiro do card */
+.cotacao-resumo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
+  background: #f7fafc;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.cotacao-resumo div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cotacao-resumo span {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--cinza-texto);
+}
+
+.cotacao-resumo strong {
+  font-size: 1rem;
+}
+
+.cotacao-resumo .positivo strong { color: #1e7a45; }
+.cotacao-resumo .negativo strong { color: #c0392b; }
+
+.cotacao-envio {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--cinza-texto);
+}
+
+.cotacao-obs {
+  font-size: 0.85rem;
+  color: var(--cinza-texto);
+  font-style: italic;
+}
+
+.cotacao-acoes {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
+
+.cotacao-acoes .btn {
+  padding: 7px 14px;
+  font-size: 0.85rem;
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--azul-oceano);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0;
+  text-align: left;
+  text-decoration: underline;
+}
+
+/* Formulário de cotação */
+.cotacao-form {
+  background: white;
+  border: 1px solid var(--cinza-borda);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.cotacao-form > h2 {
+  margin-top: 0;
+  color: var(--azul-oceano-escuro);
+}
+
+.bloco {
+  border: 1px solid var(--cinza-borda);
+  border-radius: 10px;
+  padding: 18px;
+  margin-bottom: 20px;
+}
+
+.bloco h3 {
+  margin: 0 0 14px;
+  font-size: 1rem;
+  color: var(--azul-oceano-escuro);
+}
+
+.bloco-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.bloco-topo h3 {
+  margin: 0;
+}
+
+/* Tabela do comparativo */
+.tabela-wrapper {
+  overflow-x: auto;
+}
+
+.tabela-comparativo {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  min-width: 900px;
+}
+
+.tabela-comparativo th {
+  text-align: left;
+  padding: 8px 6px;
+  color: var(--cinza-texto);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border-bottom: 1px solid var(--cinza-borda);
+  white-space: nowrap;
+}
+
+.tabela-comparativo td {
+  padding: 6px;
+  border-bottom: 1px solid #eef3f6;
+}
+
+.tabela-comparativo input {
+  width: 100%;
+  min-width: 70px;
+  padding: 6px 8px;
+  border: 1px solid var(--cinza-borda);
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.tabela-comparativo input:focus {
+  outline: none;
+  border-color: var(--azul-oceano);
+}
+
+.tabela-comparativo .col-radio {
+  text-align: center;
+  width: 60px;
+}
+
+.tabela-comparativo .col-radio input {
+  width: auto;
+  min-width: 0;
+}
+
+.celula-valor {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.celula-valor.destaque,
+.tabela-comparativo .destaque {
+  font-weight: 700;
+  color: var(--azul-oceano-escuro);
+}
+
+.linha-escolhida {
+  background-color: #eef7fb;
+}
+
+.btn-remover {
+  background: none;
+  border: none;
+  color: #c0392b;
+  font-size: 1rem;
+  padding: 4px 8px;
+}
+
+.tabela-comparativo.compacta {
+  min-width: 700px;
+}
+
+.dica {
+  margin: 10px 0 0;
+  font-size: 0.82rem;
+  color: var(--cinza-texto);
+  font-style: italic;
+}
+
+/* Resumo financeiro do formulário */
+.resumo-financeiro {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+  background: #f7fafc;
+  border-radius: 8px;
+  padding: 14px;
+  margin-top: 14px;
+}
+
+.resumo-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.resumo-item span {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--cinza-texto);
+}
+
+.resumo-item strong {
+  font-size: 1.1rem;
+}
+
+.resumo-item.positivo strong { color: #1e7a45; }
+.resumo-item.negativo strong { color: #c0392b; }
+
+/* Seletor de cliente */
+.seletor-cliente {
+  margin-bottom: 16px;
+  position: relative;
+}
+
+.rotulo {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--cinza-texto);
+  margin-bottom: 6px;
+}
+
+.cliente-selecionado {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #eef7fb;
+  border: 1px solid var(--azul-oceano);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-weight: 600;
+  color: var(--azul-oceano-escuro);
+}
+
+.lista-sugestoes {
+  border: 1px solid var(--cinza-borda);
+  border-radius: 8px;
+  margin-top: 4px;
+  overflow: hidden;
+  background: white;
+}
+
+.sugestao {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: white;
+  border: none;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  border-bottom: 1px solid #eef3f6;
+}
+
+.sugestao:hover {
+  background: #f2f8fb;
+}
+
+.sugestao small {
+  color: var(--cinza-texto);
+}
+
+.sugestao-vazia {
+  padding: 14px;
+  text-align: center;
+}
+
+.sugestao-vazia p {
+  margin: 0 0 10px;
+  color: var(--cinza-texto);
+  font-size: 0.9rem;
+}
+
+.cadastro-rapido {
+  border: 1px solid var(--cinza-borda);
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #fafcfd;
+}
+
+.cadastro-rapido h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--azul-oceano-escuro);
+}
+
+.cadastro-rapido input {
+  padding: 9px 12px;
+  border: 1px solid var(--cinza-borda);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.cotacao-form > .campo-largo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.9rem;
+  color: var(--cinza-texto);
+  margin-bottom: 20px;
+}
+
+.cotacao-form > .campo-largo textarea {
+  padding: 9px 12px;
+  border: 1px solid var(--cinza-borda);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  resize: vertical;
+}
+
+/* Títulos das etapas do formulário de cotação */
+.titulo-etapa {
+  font-size: 1rem;
+  color: var(--azul-oceano-escuro);
+  margin: 24px 0 12px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--cinza-borda);
+}
+
+.bloco-rota {
+  margin: 2px 0 0;
+  font-size: 0.82rem;
+  color: var(--cinza-texto);
+}
+
+.aviso-etapa {
+  background: #fff9e8;
+  border: 1px solid #f0d68a;
+  border-radius: 8px;
+  padding: 14px;
+  font-size: 0.9rem;
+  color: #7a5b00;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.selo-barato {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #1e7a45;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.selo-tipo {
+  display: inline-block;
+  margin-left: 8px;
+  background: var(--cinza-borda);
+  color: var(--cinza-texto);
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  vertical-align: middle;
+}
+
+.faixa-economia {
+  background: #e6f6ec;
+  color: #1e7a45;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.87rem;
+  font-weight: 600;
+  margin: 10px 0 0;
+}
+
+.subtitulo-tabela {
+  margin: 14px 0 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--azul-oceano);
+}
+
+/* Selects do formulário */
+.form-grid select {
+  padding: 9px 12px;
+  border: 1px solid var(--cinza-borda);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  background: white;
+  color: #1f2d3d;
+}
+
+.form-grid select:focus {
+  outline: none;
+  border-color: var(--azul-oceano);
+}
+
+/* Campos da tela de ajustes */
+.campo-config {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.9rem;
+  color: var(--cinza-texto);
+  margin-bottom: 18px;
+}
+
+.campo-config input,
+.campo-config textarea {
+  padding: 9px 12px;
+  border: 1px solid var(--cinza-borda);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  color: #1f2d3d;
+  resize: vertical;
+}
+
+.campo-config input:focus,
+.campo-config textarea:focus {
+  outline: none;
+  border-color: var(--azul-oceano);
+}
+
+.campo-config small {
+  font-size: 0.78rem;
+  color: var(--cinza-texto);
+  font-style: italic;
+}
+
+.tabela-comparativo input[type="time"],
+.tabela-comparativo input[type="date"] {
+  min-width: 105px;
+}
+
+/* Grupos de voo no detalhamento */
+.grupo-voo {
+  border: 1px solid var(--cinza-borda);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 14px;
+  background: #fafcfd;
+}
+
+.grupo-voo-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.grupo-voo-titulo {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--azul-oceano);
+}
+
+.grupo-voo-total {
+  margin: 10px 0 0;
+  font-size: 0.87rem;
+  color: var(--azul-oceano-escuro);
+  text-align: right;
+}
+
+.linha-escala td {
+  background: #fdf8ec;
+  color: #7a5b00;
+  font-size: 0.8rem;
+  font-style: italic;
+  padding: 6px 10px;
+}
+
+.btn-mini {
+  background: white;
+  border: 1px solid var(--azul-oceano);
+  color: var(--azul-oceano);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.btn-mini.cancelar {
+  border-color: #c0392b;
+  color: #c0392b;
+}
+
+/* Seletor de CIA dentro das tabelas */
+.cia-seletor select {
+  width: 100%;
+  min-width: 120px;
+  padding: 6px 8px;
+  border: 1px solid var(--cinza-borda);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  background: white;
+}
+
+.cia-seletor select:focus {
+  outline: none;
+  border-color: var(--azul-oceano);
+}
+
+.cia-nova {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 150px;
+}
+
+.cia-nova-acoes {
+  display: flex;
+  gap: 4px;
+}
+
+.cia-erro {
+  color: #c0392b;
+  font-size: 0.72rem;
+}
+
+/* ===== Trechos e opções por trecho ===== */
+.trecho-card {
+  border: 1px solid var(--cinza-borda);
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 12px;
+  background: #fafcfd;
+}
+
+.trecho-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.trecho-topo.editando {
+  align-items: flex-end;
+}
+
+.trecho-titulo {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--azul-oceano-escuro);
+}
+
+.trecho-data {
+  font-size: 0.82rem;
+  color: var(--cinza-texto);
+  margin-left: 10px;
+}
+
+.trecho-acoes {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.trecho-campos {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.trecho-campos label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.78rem;
+  color: var(--cinza-texto);
+}
+
+.trecho-campos input {
+  padding: 7px 10px;
+  border: 1px solid var(--cinza-borda);
+  border-radius: 6px;
+  font-size: 0.88rem;
+  min-width: 120px;
+}
+
+.col-acoes-opcao {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.btn-mini.preenchido {
+  background: #e6f6ec;
+  border-color: #1e7a45;
+  color: #1e7a45;
+}
+
+/* Painel de detalhe do voo */
+.linha-detalhe td {
+  padding: 0;
+  background: #eef7fb;
+}
+
+.detalhe-voo {
+  padding: 14px 16px;
+}
+
+.detalhe-voo-titulo {
+  margin: 0 0 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--azul-oceano);
+}
+
+.detalhe-voo-campos {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.detalhe-voo-campos label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.78rem;
+  color: var(--cinza-texto);
+}
+
+.detalhe-voo-campos input {
+  padding: 7px 10px;
+  border: 1px solid var(--cinza-borda);
+  border-radius: 6px;
+  font-size: 0.88rem;
+  min-width: 120px;
+  background: white;
+}
+
+.detalhe-voo-tempo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 14px;
+  border-left: 2px solid var(--azul-oceano);
+}
+
+.detalhe-voo-tempo span {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--cinza-texto);
+}
+
+.detalhe-voo-tempo strong {
+  font-size: 1rem;
+  color: var(--azul-oceano-escuro);
+}
+
+.faixa-escala {
+  text-align: center;
+  font-size: 0.82rem;
+  font-style: italic;
+  color: #7a5b00;
+  background: #fdf8ec;
+  border-radius: 6px;
+  padding: 6px;
+  margin: 0 0 12px;
+}
+
+.subtotal-sentido {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  background: #eef7fb;
+  border-radius: 8px;
+  padding: 12px 14px;
+  flex-wrap: wrap;
+}
+
+.subtotal-sentido span {
+  font-size: 0.85rem;
+  color: var(--cinza-texto);
+}
+
+.subtotal-sentido strong {
+  font-size: 1.15rem;
+  color: var(--azul-oceano-escuro);
+}
+
+.chamada-inicio {
+  text-align: center;
+}
+
+.chamada-inicio p {
+  margin: 0 0 12px;
+  color: var(--cinza-texto);
+}
+
+.trecho-resumo {
+  margin-bottom: 12px;
+}
+
+.trecho-resumo-titulo {
+  margin: 0 0 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--azul-oceano-escuro);
+}
+
+/* Selects dentro de campos e trechos */
+.campo-select {
+  width: 100%;
+  min-width: 140px;
+  padding: 7px 10px;
+  border: 1px solid var(--cinza-borda);
+  border-radius: 6px;
+  font-size: 0.88rem;
+  background: white;
+  color: #1f2d3d;
+}
+
+.campo-select:focus {
+  outline: none;
+  border-color: var(--azul-oceano);
+}
+
+.form-grid .campo-select {
+  padding: 9px 12px;
+  font-size: 0.95rem;
+}
+
+.detalhe-voo-campos label small {
+  font-size: 0.68rem;
+  font-style: italic;
+  color: var(--cinza-texto);
+}
+
+/* ===== Seletor com busca ===== */
+.seletor-busca {
+  position: relative;
+  width: 100%;
+}
+
+.seletor-busca-campo {
+  width: 100%;
+  min-width: 140px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--cinza-borda);
+  border-radius: 6px;
+  background: white;
+  font-size: 0.88rem;
+  color: #1f2d3d;
+  text-align: left;
+}
+
+.seletor-busca-campo.vazio {
+  color: #9aa7b4;
+}
+
+.seletor-busca-campo:hover {
+  border-color: var(--azul-oceano);
+}
+
+.seta-baixo {
+  color: var(--cinza-texto);
+  font-size: 0.7rem;
+}
+
+.seletor-busca-lista {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  min-width: 220px;
+  background: white;
+  border: 1px solid var(--cinza-borda);
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+}
+
+.seletor-busca-input {
+  width: 100%;
+  padding: 9px 12px;
+  border: none;
+  border-bottom: 1px solid var(--cinza-borda);
+  font-size: 0.88rem;
+}
+
+.seletor-busca-input:focus {
+  outline: none;
+}
+
+.seletor-busca-opcoes {
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.seletor-busca-opcao {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border: none;
+  background: white;
+  font-size: 0.88rem;
+  text-align: left;
+}
+
+.seletor-busca-opcao:hover {
+  background: #f2f8fb;
+}
+
+.seletor-busca-opcao.ativa {
+  background: #eef7fb;
+  font-weight: 600;
+  color: var(--azul-oceano-escuro);
+}
+
+.seletor-busca-opcao small {
+  color: var(--cinza-texto);
+  font-size: 0.75rem;
+}
+
+.seletor-busca-vazio {
+  padding: 14px;
+  text-align: center;
+  color: var(--cinza-texto);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.seletor-busca-criar {
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-top: 1px solid var(--cinza-borda);
+  background: #fafcfd;
+  color: var(--azul-oceano);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.seletor-busca-criar:hover {
+  background: #eef7fb;
+}
+
+/* Cadastro inline (aeroporto) */
+.cadastro-inline {
+  border: 1px solid var(--azul-oceano);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fafcfd;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 220px;
+}
+
+.cadastro-inline-titulo {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--azul-oceano);
+}
+
+.cadastro-inline label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--cinza-texto);
+}
+
+.cadastro-inline input {
+  padding: 7px 10px;
+  border: 1px solid var(--cinza-borda);
+  border-radius: 6px;
+  font-size: 0.88rem;
+}
+
+/* ===== Abas dentro do formulário ===== */
+.abas-form {
+  margin-bottom: 20px;
+}
+
+.dica-aba {
+  font-size: 0.87rem;
+  color: var(--cinza-texto);
+  margin: 0 0 16px;
+}
+
+/* Cards da aba de dados do voo */
+.voo-card {
+  border: 1px solid var(--cinza-borda);
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 12px;
+  background: #fafcfd;
+}
+
+.voo-card-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.voo-card-rota {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--azul-oceano-escuro);
+}
+
+.voo-card-cia {
+  font-size: 0.83rem;
+  color: var(--cinza-texto);
+}
+
+.voo-card-campos {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.voo-card-campos label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.78rem;
+  color: var(--cinza-texto);
+}
+
+.voo-card-campos input {
+  padding: 8px 10px;
+  border: 1px solid var(--cinza-borda);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  min-width: 130px;
+  background: white;
+}
+
+.voo-card-campos small {
+  font-size: 0.68rem;
+  font-style: italic;
+}
+
+.marca-dia {
+  color: #a2482a;
+  font-style: normal !important;
+  font-weight: 600;
+}
+
+.faixa-conexao {
+  background: #fdf8ec;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  font-size: 0.83rem;
+  color: #7a5b00;
+  text-align: center;
+}
+
+.faixa-conexao.nao-vinculada {
+  background: #fdeee8;
+  color: #a2482a;
+}
+
+.aviso-nao-vinculada {
+  display: block;
+  font-size: 0.76rem;
+  font-weight: 600;
+  margin-top: 3px;
+}
+
+/* Itens incluídos na tarifa */
+.itens-escolhidos {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.item-escolhido {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--cinza-borda);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: white;
+}
+
+.item-escolhido strong {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--azul-oceano-escuro);
+}
+
+.item-escolhido small {
+  font-size: 0.78rem;
+  color: var(--cinza-texto);
+}
+
+.item-escolhido-acoes {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.item-escolhido-acoes input {
+  width: 64px;
+  padding: 6px 8px;
+  border: 1px solid var(--cinza-borda);
+  border-radius: 6px;
+  font-size: 0.88rem;
+}
+
+/* Prévia do orçamento */
+.barra-orcamento {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.barra-orcamento .dica-aba {
+  margin: 0;
+}
+
+.barra-orcamento-acoes {
+  display: flex;
+  gap: 8px;
+}
+
+.previa-orcamento {
+  border: 1px solid var(--cinza-borda);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #e8edf2;
+  padding: 12px;
+}
+
+.previa-orcamento iframe {
+  width: 100%;
+  height: 900px;
+  border: none;
+  background: white;
+  border-radius: 6px;
+}
+
+/* Campo de imagem nos ajustes */
+.campo-imagem {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.campo-imagem img {
+  max-width: 100%;
+  border: 1px solid var(--cinza-borda);
+  border-radius: 8px;
+  display: block;
+}
+
+.campo-imagem-acoes {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.campo-imagem-acoes input[type="file"] {
+  font-size: 0.82rem;
+  border: none;
+  padding: 0;
+}

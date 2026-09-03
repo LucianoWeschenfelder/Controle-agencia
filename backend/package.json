@@ -1,0 +1,14 @@
+{
+  "name": "agencia-viagens-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node --watch --no-warnings src/server.js",
+    "start": "node --no-warnings src/server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  }
+}
