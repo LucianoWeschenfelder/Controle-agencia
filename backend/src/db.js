@@ -601,8 +601,8 @@ if (totalItens === 0) {
 
 // Textos que aparecem no orçamento enviado ao cliente
 const PADROES = {
-  agencia_nome: 'Milhas 4U',
-  agencia_slogan: 'Agência de viagem',
+  agencia_nome: 'Voya Co',
+  agencia_slogan: 'Viagens • Experiências • Destinos',
   agencia_contato: '',
   formas_pagamento: ['À vista via PIX', 'Parcelado em até 10x sem juros'].join('\n'),
   por_que_escolher: [

@@ -51,9 +51,12 @@ export default function App() {
     <div className="app">
       <header className="app-header">
         <div className="app-header-conteudo">
-          <div>
-            <h1>Agência de Viagens</h1>
-            <p className="subtitulo">{TITULOS[tela]}</p>
+          <div className="app-marca">
+            <img src="/selo.jpg" alt="Voya Co" />
+            <div>
+              <h1>Voya Co</h1>
+              <p className="subtitulo">{TITULOS[tela]}</p>
+            </div>
           </div>
 
           <div className="app-header-acoes">

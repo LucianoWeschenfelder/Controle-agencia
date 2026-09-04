@@ -1,7 +1,10 @@
-# Agência de Viagens - Controle de Clientes
+# Voya Co — Sistema da agência
 
 Projeto de portfólio para acompanhamento de uma agência de viagens (clientes, cotações, check-in etc).
 Primeira etapa: cadastro e listagem de clientes.
+
+## Identidade visual
+O sistema usa a paleta da marca: navy, dourado e creme, com títulos em serifa. O selo fica no cabeçalho (`frontend/public/selo.jpg`) e serve também como ícone da aba. Nome e slogan da agência são editáveis em Ajustes.
 
 ## Stack
 - Frontend: React (Vite) + CSS puro
