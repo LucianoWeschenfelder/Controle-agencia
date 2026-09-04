@@ -16,21 +16,13 @@ export function calcularCusto(opcao) {
 
 function LinhaOpcao({
   opcao, trecho, maisBarata, aberta, onAlterar, onEscolher, onRemover, onAlternarDetalhe,
-  podeRemover, cias, onNovaCia,
+  podeRemover, cias, onNovaCia, pagantes,
 }) {
   const custo = calcularCusto(opcao);
+  const custoTodos = custo * pagantes;
 
-  const tempoVoo = minutosEntre(
-    trecho.data, opcao.hora_saida, trecho.data, opcao.hora_chegada
-  );
-
-  // A duração informada manualmente tem prioridade sobre a calculada
-  const duracaoFinal =
-    opcao.duracao_min !== '' && opcao.duracao_min != null
-      ? Number(opcao.duracao_min)
-      : tempoVoo;
-
-  const detalheCompleto = opcao.hora_saida && opcao.hora_chegada;
+  // Os horários vivem nos voos da opção, preenchidos na aba "Dados do voo"
+  const detalheCompleto = (opcao.voos || []).some((v) => v.hora_saida && v.hora_chegada);
 
   return (
     <>
@@ -77,18 +69,18 @@ function LinhaOpcao({
             onChange={(e) => onAlterar('bagagem', e.target.value)}
           />
         </td>
-        <td className="celula-valor destaque">
+        <td className="celula-valor">
           {formatarMoeda(custo)}
           {maisBarata && <span className="selo-barato">mais barata</span>}
         </td>
+        <td className="celula-valor destaque">{formatarMoeda(custoTodos)}</td>
         <td className="col-acoes-opcao">
-          <button
-            type="button"
-            className={`btn-mini ${detalheCompleto ? 'preenchido' : ''}`}
-            onClick={onAlternarDetalhe}
+          <span
+            className={`selo-voo ${detalheCompleto ? 'preenchido' : ''}`}
+            title="Os horários são preenchidos na aba Dados do voo"
           >
-            {aberta ? 'Fechar' : detalheCompleto ? '✓ Voo' : 'Detalhar'}
-          </button>
+            {detalheCompleto ? '✓ voo' : 'sem voo'}
+          </span>
           {podeRemover && (
             <button type="button" className="btn-remover" onClick={onRemover} title="Remover CIA">
               ✕
@@ -97,74 +89,6 @@ function LinhaOpcao({
         </td>
       </tr>
 
-      {aberta && (
-        <tr className="linha-detalhe">
-          <td colSpan={8}>
-            <div className="detalhe-voo">
-              <p className="detalhe-voo-titulo">
-                Dados do voo · {opcao.cia || 'CIA'} · {trecho.origem || '—'} → {trecho.destino || '—'}
-              </p>
-
-              <div className="detalhe-voo-campos">
-                <label>
-                  Horário de saída
-                  <input
-                    type="time"
-                    value={opcao.hora_saida}
-                    onChange={(e) => onAlterar('hora_saida', e.target.value)}
-                  />
-                </label>
-                <label>
-                  Horário de chegada
-                  <input
-                    type="time"
-                    value={opcao.hora_chegada}
-                    onChange={(e) => onAlterar('hora_chegada', e.target.value)}
-                  />
-                </label>
-                <label>
-                  Nº do voo
-                  <input
-                    value={opcao.numero_voo}
-                    onChange={(e) => onAlterar('numero_voo', e.target.value)}
-                    placeholder="G31234"
-                  />
-                </label>
-                <label>
-                  Classe
-                  <input
-                    value={opcao.classe}
-                    onChange={(e) => onAlterar('classe', e.target.value)}
-                    placeholder="Econômica"
-                  />
-                </label>
-                <label>
-                  Aeronave
-                  <input
-                    value={opcao.aeronave}
-                    onChange={(e) => onAlterar('aeronave', e.target.value)}
-                    placeholder="Airbus A350-900"
-                  />
-                </label>
-                <label>
-                  Duração (min)
-                  <input
-                    type="number"
-                    value={opcao.duracao_min}
-                    onChange={(e) => onAlterar('duracao_min', e.target.value)}
-                    placeholder={tempoVoo ?? ''}
-                  />
-                  <small>Só preencha em voo com troca de fuso</small>
-                </label>
-                <div className="detalhe-voo-tempo">
-                  <span>Tempo de voo</span>
-                  <strong>{formatarDuracao(duracaoFinal) || '—'}</strong>
-                </div>
-              </div>
-            </div>
-          </td>
-        </tr>
-      )}
     </>
   );
 }
@@ -240,7 +164,7 @@ function CabecalhoTrecho({ trecho, indice, editando, onAlterar, onEditar, onRemo
 
 export default function BlocoSentido({
   titulo, icone, rota, trechos, cias, onNovaCia, aeroportos, onNovoAeroporto,
-  cidades, onNovaCidade,
+  cidades, onNovaCidade, pagantes = 1,
   onAlterarTrecho, onAdicionarTrecho, onRemoverTrecho,
   onAlterarOpcao, onAdicionarOpcao, onRemoverOpcao, onEscolherOpcao,
 }) {
@@ -252,27 +176,44 @@ export default function BlocoSentido({
   const subtotal = escolhidas.filter(Boolean).reduce((s, o) => s + calcularCusto(o), 0);
   const temEscolha = escolhidas.some(Boolean);
 
-  // Duração de um voo: o valor informado tem prioridade sobre o calculado
+  // Primeiro e último voo de uma opção, base para os horários do trecho
+  function primeiroVoo(opcao) {
+    return (opcao?.voos || []).find((v) => v.hora_saida) || null;
+  }
+
+  function ultimoVoo(opcao) {
+    return [...(opcao?.voos || [])].reverse().find((v) => v.hora_chegada) || null;
+  }
+
+  // Duração do trecho: da saída do primeiro voo à chegada do último
   function duracaoDe(trecho, opcao) {
-    if (!opcao) return null;
-    if (opcao.duracao_min !== '' && opcao.duracao_min != null) return Number(opcao.duracao_min);
-    return minutosEntre(trecho.data, opcao.hora_saida, trecho.data, opcao.hora_chegada);
+    const inicio = primeiroVoo(opcao);
+    const fim = ultimoVoo(opcao);
+    if (!inicio || !fim) return null;
+
+    return minutosEntre(
+      inicio.data || trecho.data, inicio.hora_saida,
+      fim.data || trecho.data, fim.hora_chegada
+    );
   }
 
   // Escalas: da chegada de um trecho até a saída do seguinte.
   // A chegada pode ter caído no dia seguinte, então usamos a data real.
   const escalas = trechos.slice(0, -1).map((t, i) => {
-    const atual = escolhidas[i];
-    const proximo = escolhidas[i + 1];
-    if (!atual?.hora_chegada || !proximo?.hora_saida) return null;
+    const fimAtual = ultimoVoo(escolhidas[i]);
+    const inicioProximo = primeiroVoo(escolhidas[i + 1]);
+    const inicioAtual = primeiroVoo(escolhidas[i]);
+    if (!fimAtual?.hora_chegada || !inicioProximo?.hora_saida) return null;
 
-    const chegada = dataDeChegada(t.data, atual.hora_saida, atual.hora_chegada);
+    const chegada = dataDeChegada(
+      fimAtual.data || t.data, inicioAtual.hora_saida, fimAtual.hora_chegada
+    );
 
     return {
       aeroporto: t.destino,
       minutos: minutosEntre(
-        chegada, atual.hora_chegada,
-        trechos[i + 1].data || chegada, proximo.hora_saida
+        chegada, fimAtual.hora_chegada,
+        inicioProximo.data || trechos[i + 1].data || chegada, inicioProximo.hora_saida
       ),
     };
   });
@@ -341,7 +282,8 @@ export default function BlocoSentido({
                       <th>Milheiro</th>
                       <th>Taxa</th>
                       <th>Bagagem</th>
-                      <th>Custo</th>
+                      <th>Por pessoa</th>
+                      <th>Total ({pagantes}x)</th>
                       <th></th>
                     </tr>
                   </thead>
@@ -363,6 +305,7 @@ export default function BlocoSentido({
                           onAlterar={(campo, valor) => onAlterarOpcao(iT, iO, campo, valor)}
                           onEscolher={() => onEscolherOpcao(iT, iO)}
                           onRemover={() => onRemoverOpcao(iT, iO)}
+                          pagantes={pagantes}
                           onAlternarDetalhe={() =>
                             setDetalheAberto(detalheAberto === chave ? null : chave)
                           }
@@ -386,10 +329,17 @@ export default function BlocoSentido({
       {temEscolha && (
         <div className="subtotal-sentido">
           <span>
-            Subtotal por passageiro
+            Subtotal
             {tempoTotal !== null && ` · duração total ${formatarDuracao(tempoTotal)}`}
           </span>
-          <strong>{formatarMoeda(subtotal)}</strong>
+          <span className="subtotal-valores">
+            <span>
+              {formatarMoeda(subtotal)} <small>por pessoa</small>
+            </span>
+            <strong>
+              {formatarMoeda(subtotal * pagantes)} <small>total</small>
+            </strong>
+          </span>
         </div>
       )}
     </section>

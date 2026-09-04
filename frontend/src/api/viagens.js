@@ -55,3 +55,33 @@ export async function excluirViagem(id) {
 export async function buscarViagem(id) {
   return tratarResposta(await fetch(`${BASE_URL}/${id}`));
 }
+
+export async function definirLocalizador(viagemId, chave, localizador) {
+  return tratarResposta(
+    await fetch(`${BASE_URL}/${viagemId}/localizador`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chave, localizador }),
+    })
+  );
+}
+
+export async function salvarBloco(viagemId, dados) {
+  return tratarResposta(
+    await fetch(`${BASE_URL}/${viagemId}/bloco`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(dados),
+    })
+  );
+}
+
+export async function salvarVoos(viagemId, voos) {
+  return tratarResposta(
+    await fetch(`${BASE_URL}/${viagemId}/voos`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ voos }),
+    })
+  );
+}

@@ -21,6 +21,7 @@ export default function ViagemEditar({ viagemId, onSalvar, onCancelar }) {
             nome: existentes[i]?.nome || '',
             documento: existentes[i]?.documento || '',
             data_nascimento: existentes[i]?.data_nascimento || '',
+            tipo: existentes[i]?.tipo || 'adulto',
           }))
         );
       })
@@ -108,9 +109,21 @@ export default function ViagemEditar({ viagemId, onSalvar, onCancelar }) {
       {acompanhantes.length > 0 && (
         <section className="bloco">
           <h3>Acompanhantes ({acompanhantes.length})</h3>
+          <p className="dica">
+            A cotação prevê {dados.adultos} adulto(s), {dados.criancas} criança(s) e{' '}
+            {dados.bebes} bebê(s), contando o titular.
+          </p>
 
           {acompanhantes.map((a, i) => (
             <div className="acompanhante-linha" key={i}>
+              <select
+                value={a.tipo}
+                onChange={(e) => alterarAcompanhante(i, 'tipo', e.target.value)}
+              >
+                <option value="adulto">Adulto</option>
+                <option value="crianca">Criança</option>
+                <option value="bebe">Bebê</option>
+              </select>
               <input
                 placeholder={`Nome completo do passageiro ${i + 2}`}
                 value={a.nome}

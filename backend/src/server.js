@@ -10,6 +10,7 @@ import cidadesRouter from './routes/cidades.js';
 import itensTarifaRouter from './routes/itens-tarifa.js';
 import viagensRouter from './routes/viagens.js';
 import fornecedoresRouter from './routes/fornecedores.js';
+import classesRouter from './routes/classes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -26,6 +27,7 @@ app.use('/api/cidades', cidadesRouter);
 app.use('/api/itens-tarifa', itensTarifaRouter);
 app.use('/api/viagens', viagensRouter);
 app.use('/api/fornecedores', fornecedoresRouter);
+app.use('/api/classes', classesRouter);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });

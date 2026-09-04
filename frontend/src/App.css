@@ -757,7 +757,7 @@
   font-size: 0.9rem;
 }
 
-.cotacao-form > .campo-largo {
+.cotacao-form .campo-largo:not(.form-grid .campo-largo) {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -766,7 +766,7 @@
   margin-bottom: 20px;
 }
 
-.cotacao-form > .campo-largo textarea {
+.cotacao-form .campo-largo > textarea {
   padding: 9px 12px;
   border: 1px solid var(--cinza-borda);
   border-radius: 8px;
@@ -1993,4 +1993,384 @@
 .trecho-campos .campo-seletor-rotulo,
 .cadastro-inline .campo-seletor-rotulo {
   font-size: 0.78rem;
+}
+
+/* Voos dentro de um trecho na aba de dados do voo */
+.voo-perna {
+  border: 1px solid var(--cinza-borda);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 10px;
+  background: white;
+}
+
+.voo-perna-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.voo-perna-titulo {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--azul-oceano);
+}
+
+.aviso-vinculada {
+  display: block;
+  font-size: 0.76rem;
+  font-weight: 600;
+  margin-top: 3px;
+  color: #1e7a45;
+}
+
+.voo-card-campos .campo-seletor {
+  min-width: 150px;
+}
+
+/* Selo do voo na tabela do comparativo */
+.selo-voo {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 10px;
+  background: #f2f4f6;
+  color: var(--cinza-texto);
+  white-space: nowrap;
+}
+
+.selo-voo.preenchido {
+  background: #e6f6ec;
+  color: #1e7a45;
+}
+
+.subtotal-valores {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+}
+
+.subtotal-valores small {
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--cinza-texto);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+/* Origem da compra por trecho */
+.compra-trechos {
+  background: #fff9e8;
+  border: 1px solid #f0d68a;
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.compra-trechos.definida {
+  background: #f7fafc;
+  border-color: var(--cinza-borda);
+}
+
+.compra-trechos-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.compra-titulo {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #7a5b00;
+}
+
+.compra-trechos-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.compra-linha {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 0.88rem;
+}
+
+.compra-rota {
+  font-size: 0.82rem;
+  color: var(--cinza-texto);
+  min-width: 190px;
+}
+
+.compra-linha strong {
+  color: var(--azul-oceano-escuro);
+}
+
+.compra-editar {
+  border-top: 1px solid #f0d68a;
+  padding-top: 10px;
+}
+
+.compra-opcoes {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.compra-opcoes label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.compra-fornecedor {
+  min-width: 220px;
+}
+
+/* Datas editáveis */
+.datas-editar {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: #f7fafc;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.datas-editar label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.78rem;
+  color: var(--cinza-texto);
+}
+
+.datas-editar input {
+  padding: 7px 10px;
+  border: 1px solid var(--cinza-borda);
+  border-radius: 6px;
+  font-size: 0.88rem;
+}
+
+/* Localizador por reserva */
+.localizador-linha {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--cinza-borda);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: white;
+  flex-wrap: wrap;
+}
+
+.localizador-linha span {
+  font-size: 0.85rem;
+  color: var(--cinza-texto);
+}
+
+.localizador-linha input {
+  width: 140px;
+  padding: 8px 10px;
+  border: 1px solid var(--cinza-borda);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.localizador-inline {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.localizador-inline input {
+  width: 110px;
+  padding: 5px 8px;
+  border: 1px solid var(--azul-oceano);
+  border-radius: 6px;
+  font-size: 0.88rem;
+}
+
+.localizador-clicavel {
+  cursor: pointer;
+  border-bottom: 1px dashed var(--azul-oceano);
+}
+
+/* Tipo do passageiro */
+.selo-tipo-passageiro {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 1px 7px;
+  border-radius: 8px;
+  margin-right: 8px;
+  background: var(--cinza-borda);
+  color: var(--cinza-texto);
+}
+
+.selo-tipo-passageiro.crianca {
+  background: #fff4e0;
+  color: #a86400;
+}
+
+.selo-tipo-passageiro.bebe {
+  background: #fdeee8;
+  color: #a2482a;
+}
+
+.acompanhante-linha select {
+  padding: 9px 12px;
+  border: 1px solid var(--cinza-borda);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  background: white;
+}
+
+/* Itinerário do bloco no card */
+.itinerario-bloco {
+  border: 1px solid var(--cinza-borda);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.itinerario-voo {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 12px;
+  flex-wrap: wrap;
+}
+
+.itinerario-horas {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--azul-oceano-escuro);
+  min-width: 130px;
+}
+
+.itinerario-horas sup {
+  color: #a2482a;
+  font-size: 0.7rem;
+}
+
+.itinerario-rota {
+  font-weight: 600;
+  color: var(--azul-oceano);
+  flex: 1;
+}
+
+.itinerario-voo-num {
+  font-size: 0.83rem;
+  color: var(--cinza-texto);
+}
+
+.itinerario-escala {
+  margin: 0;
+  background: #fdf8ec;
+  border-top: 1px dashed #ddd3bd;
+  border-bottom: 1px dashed #ddd3bd;
+  text-align: center;
+  padding: 6px;
+  font-size: 0.8rem;
+  color: #7a5b00;
+}
+
+/* Edição de um bloco */
+.editar-bloco {
+  border: 2px solid var(--azul-oceano);
+  border-radius: 10px;
+  padding: 14px;
+  background: #fafcfd;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.editar-bloco-titulo {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--azul-oceano-escuro);
+}
+
+.editar-bloco-campos {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.editar-bloco-campos label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.78rem;
+  color: var(--cinza-texto);
+}
+
+.editar-bloco-campos input,
+.editar-bloco-campos select {
+  padding: 8px 10px;
+  border: 1px solid var(--cinza-borda);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  background: white;
+}
+
+/* Resumo da compra, clicável para expandir */
+.compra-resumo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+}
+
+.compra-resumo span:first-child {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--cinza-texto);
+}
+
+.compra-resumo strong {
+  font-size: 0.95rem;
+  color: var(--azul-oceano-escuro);
+  flex: 1;
+}
+
+.compra-resumo strong.pendente {
+  color: #a86400;
+  font-style: italic;
+}
+
+/* Detalhes expandidos do card de viagem */
+.detalhes-expandidos {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-left: 3px solid var(--cinza-borda);
+  padding-left: 12px;
 }

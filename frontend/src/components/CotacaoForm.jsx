@@ -5,15 +5,20 @@ import SeletorAeroporto from './SeletorAeroporto';
 import { formatarMoeda } from '../utils/formato';
 import { listarCias } from '../api/cias';
 import { listarAeroportos, listarCidades, listarItensTarifa } from '../api/cadastros';
+import { listarClasses, criarClasse } from '../api/classes';
 import AbaDadosVoo from './AbaDadosVoo';
 import AbaOrcamento from './AbaOrcamento';
 import SeletorBusca from './SeletorBusca';
 import { buscarConfiguracoes } from '../api/configuracoes';
 
+const VOO_VAZIO = {
+  origem: '', destino: '', data: '', hora_saida: '', hora_chegada: '',
+  numero_voo: '', duracao_min: '',
+};
+
 const OPCAO_VAZIA = {
   cia: '', classe: '', milhas: '', valor_milheiro: '', taxa: '', bagagem: '',
-  hora_saida: '', hora_chegada: '', numero_voo: '', aeronave: '', duracao_min: '',
-  escolhida: false,
+  voos: [{ ...VOO_VAZIO }], escolhida: false,
 };
 
 const TRECHO_VAZIO = { origem: '', destino: '', data: '', opcoes: [{ ...OPCAO_VAZIA }] };
@@ -21,7 +26,7 @@ const TRECHO_VAZIO = { origem: '', destino: '', data: '', opcoes: [{ ...OPCAO_VA
 const COTACAO_VAZIA = {
   cliente_id: '', origem: '', destino: '', tipo_viagem: 'ida_volta',
   data_ida: '', data_volta: '', adultos: 1, criancas: 0, bebes: 0,
-  valor_internet: '', preco_venda_unitario: '', observacoes: '',
+  valor_internet: '', preco_venda: '', observacoes: '',
 };
 
 // Converte os trechos vindos da API para o formato dos campos do formulário
@@ -42,9 +47,17 @@ function trechosParaFormulario(trechos) {
           bagagem: o.bagagem ?? '',
           hora_saida: o.hora_saida || '',
           hora_chegada: o.hora_chegada || '',
-          numero_voo: o.numero_voo || '',
-          aeronave: o.aeronave || '',
-          duracao_min: o.duracao_min ?? '',
+          voos: o.voos?.length
+            ? o.voos.map((v) => ({
+                origem: v.origem || '',
+                destino: v.destino || '',
+                data: v.data || '',
+                hora_saida: v.hora_saida || '',
+                hora_chegada: v.hora_chegada || '',
+                numero_voo: v.numero_voo || '',
+                duracao_min: v.duracao_min ?? '',
+              }))
+            : [{ ...VOO_VAZIO, origem: t.origem || '', destino: t.destino || '', data: t.data || '' }],
           escolhida: !!o.escolhida,
         }))
       : [{ ...OPCAO_VAZIA }],
@@ -59,7 +72,7 @@ export default function CotacaoForm({ cotacaoEditando, onSalvar, onCancelar }) {
           ...cotacaoEditando,
           data_volta: cotacaoEditando.data_volta || '',
           valor_internet: cotacaoEditando.valor_internet ?? '',
-          preco_venda_unitario: cotacaoEditando.preco_venda_unitario ?? '',
+          preco_venda: cotacaoEditando.preco_venda ?? '',
           observacoes: cotacaoEditando.observacoes || '',
         }
       : COTACAO_VAZIA
@@ -76,6 +89,7 @@ export default function CotacaoForm({ cotacaoEditando, onSalvar, onCancelar }) {
   const [aeroportos, setAeroportos] = useState([]);
   const [cidades, setCidades] = useState([]);
   const [catalogoItens, setCatalogoItens] = useState([]);
+  const [classes, setClasses] = useState([]);
   const [config, setConfig] = useState({});
   const [aba, setAba] = useState('cotacao');
 
@@ -94,8 +108,22 @@ export default function CotacaoForm({ cotacaoEditando, onSalvar, onCancelar }) {
     listarAeroportos().then(setAeroportos).catch(() => {});
     listarCidades().then(setCidades).catch(() => {});
     listarItensTarifa().then(setCatalogoItens).catch(() => {});
+    listarClasses().then(setClasses).catch(() => {});
     buscarConfiguracoes().then(setConfig).catch(() => {});
   }, []);
+
+  // Cadastra a classe e já devolve para o campo que a pediu
+  async function cadastrarClasse(nome) {
+    try {
+      const nova = await criarClasse(nome);
+      setClasses((prev) =>
+        prev.some((c) => c.id === nova.id) ? prev : [...prev, nova].sort((a, b) => a.nome.localeCompare(b.nome))
+      );
+      return nova;
+    } catch {
+      return null;
+    }
+  }
 
   function adicionarCidadeNaLista(nova) {
     setCidades((prev) =>
@@ -146,12 +174,19 @@ export default function CotacaoForm({ cotacaoEditando, onSalvar, onCancelar }) {
         setLista((prev) => {
           const anterior = prev[prev.length - 1];
 
-          // O novo trecho começa onde o anterior terminou e vai até o destino final
+          // O último voo do trecho anterior manda: é de lá que o próximo sai
+          const ultimoVoo = anterior?.opcoes
+            ?.flatMap((o) => o.voos || [])
+            .filter((v) => v.destino)
+            .at(-1);
+
+          const partidaDoProximo = ultimoVoo?.destino || anterior?.destino || '';
+
           return [
             ...prev,
             {
               ...TRECHO_VAZIO,
-              origem: anterior?.destino || '',
+              origem: partidaDoProximo,
               destino: sentido === 'ida' ? dados.destino : dados.origem,
               data: anterior?.data || (sentido === 'ida' ? dados.data_ida : dados.data_volta),
               opcoes: [{ ...OPCAO_VAZIA }],
@@ -209,6 +244,100 @@ export default function CotacaoForm({ cotacaoEditando, onSalvar, onCancelar }) {
     );
   }
 
+  // Altera um campo de um voo específico dentro de uma opção
+  function alterarVoo(sentido, iT, iO, iV, campo, valor) {
+    const setLista = sentido === 'ida' ? setTrechosIda : setTrechosVolta;
+
+    setLista((prev) =>
+      prev.map((t, i) =>
+        i !== iT
+          ? t
+          : {
+              ...t,
+              opcoes: t.opcoes.map((o, j) =>
+                j !== iO
+                  ? o
+                  : {
+                      ...o,
+                      voos: (o.voos || []).map((v, k) => {
+                        if (k === iV) return { ...v, [campo]: valor };
+                        // A conexão seguinte começa onde este voo termina
+                        if (k === iV + 1 && campo === 'destino') return { ...v, origem: valor };
+                        return v;
+                      }),
+                    }
+              ),
+            }
+      )
+    );
+  }
+
+  /*
+   * Uma conexão nova começa onde o voo anterior terminou e vai até o destino
+   * do trecho, para não precisar redigitar.
+   */
+  function adicionarVoo(sentido, iT, iO) {
+    const setLista = sentido === 'ida' ? setTrechosIda : setTrechosVolta;
+
+    setLista((prev) =>
+      prev.map((t, i) =>
+        i !== iT
+          ? t
+          : {
+              ...t,
+              opcoes: t.opcoes.map((o, j) => {
+                if (j !== iO) return o;
+
+                const voos = o.voos || [];
+                const anterior = voos.at(-1);
+
+                /*
+                 * O voo anterior deixa de ir até o destino final: ele passa a
+                 * terminar na conexão, que o usuário escolhe. Como ainda não
+                 * sabemos qual é, o destino dele fica em branco e o novo voo
+                 * já começa dali, seguindo até o destino do trecho.
+                 */
+                const anteriorEraFinal = anterior?.destino === t.destino;
+
+                const voosAjustados = anteriorEraFinal
+                  ? voos.map((v, k) => (k === voos.length - 1 ? { ...v, destino: '' } : v))
+                  : voos;
+
+                return {
+                  ...o,
+                  voos: [
+                    ...voosAjustados,
+                    {
+                      ...VOO_VAZIO,
+                      origem: anteriorEraFinal ? '' : anterior?.destino || '',
+                      destino: t.destino || '',
+                      data: anterior?.data || t.data || '',
+                    },
+                  ],
+                };
+              }),
+            }
+      )
+    );
+  }
+
+  function removerVoo(sentido, iT, iO, iV) {
+    const setLista = sentido === 'ida' ? setTrechosIda : setTrechosVolta;
+
+    setLista((prev) =>
+      prev.map((t, i) =>
+        i !== iT
+          ? t
+          : {
+              ...t,
+              opcoes: t.opcoes.map((o, j) =>
+                j !== iO ? o : { ...o, voos: (o.voos || []).filter((_, k) => k !== iV) }
+              ),
+            }
+      )
+    );
+  }
+
   const hIda = criarHandlers(setTrechosIda, 'ida');
   const hVolta = criarHandlers(setTrechosVolta, 'volta');
 
@@ -250,9 +379,8 @@ export default function CotacaoForm({ cotacaoEditando, onSalvar, onCancelar }) {
   const custoUnitario = subtotalIda + subtotalVolta;
   const custoTotal = temEscolha ? custoUnitario * pagantes : null;
 
-  const vendaUnitaria =
-    dados.preco_venda_unitario === '' ? null : Number(dados.preco_venda_unitario);
-  const precoVenda = vendaUnitaria !== null ? vendaUnitaria * pagantes : null;
+  // Preço de venda e valor da internet já são o total de todos os passageiros
+  const precoVenda = dados.preco_venda === '' ? null : Number(dados.preco_venda);
 
   const lucro = custoTotal !== null && precoVenda !== null ? precoVenda - custoTotal : null;
 
@@ -468,6 +596,7 @@ export default function CotacaoForm({ cotacaoEditando, onSalvar, onCancelar }) {
           onNovoAeroporto={adicionarAeroportoNaLista}
           cidades={cidades}
           onNovaCidade={adicionarCidadeNaLista}
+          pagantes={pagantes}
           onAlterarTrecho={hIda.alterarTrecho}
           onAdicionarTrecho={hIda.adicionarTrecho}
           onRemoverTrecho={hIda.removerTrecho}
@@ -498,6 +627,7 @@ export default function CotacaoForm({ cotacaoEditando, onSalvar, onCancelar }) {
             onNovoAeroporto={adicionarAeroportoNaLista}
             cidades={cidades}
             onNovaCidade={adicionarCidadeNaLista}
+            pagantes={pagantes}
             onAlterarTrecho={hVolta.alterarTrecho}
             onAdicionarTrecho={hVolta.adicionarTrecho}
             onRemoverTrecho={hVolta.removerTrecho}
@@ -513,7 +643,7 @@ export default function CotacaoForm({ cotacaoEditando, onSalvar, onCancelar }) {
       <section className="bloco">
         <div className="form-grid">
           <label>
-            Valor da passagem na internet
+            Valor na internet (todos os passageiros)
             <input
               type="number"
               step="0.01"
@@ -523,19 +653,17 @@ export default function CotacaoForm({ cotacaoEditando, onSalvar, onCancelar }) {
             />
           </label>
           <label>
-            Preço de venda por passageiro
+            Preço de venda (todos os passageiros)
             <input
               type="number"
               step="0.01"
-              name="preco_venda_unitario"
-              value={dados.preco_venda_unitario}
+              name="preco_venda"
+              value={dados.preco_venda}
               onChange={handleChange}
             />
-            <small>
-              {pagantes > 1
-                ? `Multiplicado por ${pagantes} pagantes`
-                : 'Valor cobrado de cada passageiro pagante'}
-            </small>
+            {precoVenda !== null && pagantes > 1 && (
+              <small>{formatarMoeda(precoVenda / pagantes)} por passageiro pagante</small>
+            )}
           </label>
         </div>
 
@@ -555,7 +683,7 @@ export default function CotacaoForm({ cotacaoEditando, onSalvar, onCancelar }) {
             <strong>{custoTotal !== null ? formatarMoeda(custoTotal) : '—'}</strong>
           </div>
           <div className="resumo-item">
-            <span>Venda total ({pagantes}x)</span>
+            <span>Venda total</span>
             <strong>{precoVenda !== null ? formatarMoeda(precoVenda) : '—'}</strong>
           </div>
           <div className={`resumo-item ${lucro !== null && lucro < 0 ? 'negativo' : 'positivo'}`}>
@@ -587,7 +715,16 @@ export default function CotacaoForm({ cotacaoEditando, onSalvar, onCancelar }) {
           trechosIda={trechosIda}
           trechosVolta={trechosVolta}
           idaEVolta={idaEVolta}
+          aeroportos={aeroportos}
+          cidades={cidades}
+          classes={classes}
           onAlterarOpcao={alterarOpcaoPorSentido}
+          onAlterarVoo={alterarVoo}
+          onAdicionarVoo={adicionarVoo}
+          onRemoverVoo={removerVoo}
+          onNovoAeroporto={adicionarAeroportoNaLista}
+          onNovaCidade={adicionarCidadeNaLista}
+          onNovaClasse={cadastrarClasse}
         />
 
         <section className="bloco">

@@ -7,7 +7,7 @@ export default function ViagemForm({ onSalvar, onCancelar }) {
   const [disponiveis, setDisponiveis] = useState([]);
   const [cotacaoId, setCotacaoId] = useState('');
   const [antecedencia, setAntecedencia] = useState(24);
-  const [localizador, setLocalizador] = useState('');
+  const [localizadores, setLocalizadores] = useState({});
   const [observacoes, setObservacoes] = useState('');
   const [acompanhantes, setAcompanhantes] = useState([]);
   const [erro, setErro] = useState('');
@@ -31,11 +31,30 @@ export default function ViagemForm({ onSalvar, onCancelar }) {
     setCotacaoId(id);
 
     const cotacao = disponiveis.find((c) => c.id === Number(id));
-    const quantos = Math.max((cotacao?.passageiros || 1) - 1, 0);
+    if (!cotacao) return;
+
+    /*
+     * O titular conta como um adulto. Os acompanhantes já nascem com o tipo
+     * certo, seguindo a quantidade informada na cotação.
+     */
+    const tipos = [
+      ...Array(Math.max((cotacao.adultos || 1) - 1, 0)).fill('adulto'),
+      ...Array(cotacao.criancas || 0).fill('crianca'),
+      ...Array(cotacao.bebes || 0).fill('bebe'),
+    ];
 
     setAcompanhantes(
-      Array.from({ length: quantos }, () => ({ nome: '', documento: '', data_nascimento: '' }))
+      tipos.map((tipo) => ({ nome: '', documento: '', data_nascimento: '', tipo }))
     );
+
+    // Voo separado tem reserva própria, então cada unidade tem seu localizador
+    setLocalizadores(
+      Object.fromEntries((cotacao.unidades || []).map((u) => [u.chave, '']))
+    );
+  }
+
+  function alterarLocalizador(chave, valor) {
+    setLocalizadores((prev) => ({ ...prev, [chave]: valor.toUpperCase() }));
   }
 
   function alterarAcompanhante(i, campo, valor) {
@@ -53,7 +72,7 @@ export default function ViagemForm({ onSalvar, onCancelar }) {
       await onSalvar({
         cotacao_id: Number(cotacaoId),
         antecedencia_checkin: antecedencia,
-        localizador,
+        localizadores,
         observacoes,
         acompanhantes,
       });
@@ -89,11 +108,18 @@ export default function ViagemForm({ onSalvar, onCancelar }) {
 
             <SeletorBusca
               valor={cotacaoId}
-              opcoes={disponiveis.map((c) => ({
-                valor: c.id,
-                rotulo: `${c.cliente?.nome} · ${c.ida?.origem} → ${c.ida?.destino}`,
-                sub: formatarData(c.ida?.data),
-              }))}
+              opcoes={disponiveis.map((c) => {
+                // A rota vai do primeiro ao último aeroporto da ida
+                const ida = (c.unidades || []).filter((u) => u.sentido === 'ida');
+                const origem = ida[0]?.origem || '—';
+                const destino = ida.at(-1)?.destino || '—';
+
+                return {
+                  valor: c.id,
+                  rotulo: `${c.cliente?.nome} · ${origem} → ${destino}`,
+                  sub: formatarData(ida[0]?.data),
+                };
+              })}
               onSelecionar={escolherCotacao}
               placeholder="Buscar cotação vendida..."
             />
@@ -118,7 +144,11 @@ export default function ViagemForm({ onSalvar, onCancelar }) {
                 </div>
                 <div>
                   <span>Passageiros</span>
-                  <strong>{escolhida.passageiros}</strong>
+                  <strong>
+                    {escolhida.adultos} adulto(s)
+                    {escolhida.criancas > 0 && `, ${escolhida.criancas} criança(s)`}
+                    {escolhida.bebes > 0 && `, ${escolhida.bebes} bebê(s)`}
+                  </strong>
                 </div>
                 <div className="campo-largo-auto">
                   <span>Check-ins que serão criados</span>
@@ -154,14 +184,31 @@ export default function ViagemForm({ onSalvar, onCancelar }) {
                 </select>
               </label>
 
-              <label>
-                Localizador / reserva
-                <input
-                  value={localizador}
-                  onChange={(e) => setLocalizador(e.target.value.toUpperCase())}
-                  placeholder="ABC123"
-                />
-              </label>
+              {escolhida && (
+                <div className="campo-largo">
+                  <p className="rotulo">
+                    Localizador de cada reserva
+                    {escolhida.unidades.length > 1 &&
+                      ' — voos separados têm localizadores diferentes'}
+                  </p>
+
+                  {escolhida.unidades.map((u) => (
+                    <div className="localizador-linha" key={u.chave}>
+                      <span>
+                        {u.sentido === 'ida' ? 'Ida' : 'Volta'}
+                        {u.parte ? ` (parte ${u.parte}/${u.total_partes})` : ''} ·{' '}
+                        {u.origem} → {u.destino} · {u.cia || 'sem CIA'}
+                        {u.conexoes > 0 && ` · ${u.conexoes} escala vinculada`}
+                      </span>
+                      <input
+                        value={localizadores[u.chave] || ''}
+                        onChange={(e) => alterarLocalizador(u.chave, e.target.value)}
+                        placeholder="ABC123"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {acompanhantes.length > 0 && (
                 <div className="campo-largo">
@@ -172,6 +219,14 @@ export default function ViagemForm({ onSalvar, onCancelar }) {
 
                   {acompanhantes.map((a, i) => (
                     <div className="acompanhante-linha" key={i}>
+                      <select
+                        value={a.tipo}
+                        onChange={(e) => alterarAcompanhante(i, 'tipo', e.target.value)}
+                      >
+                        <option value="adulto">Adulto</option>
+                        <option value="crianca">Criança</option>
+                        <option value="bebe">Bebê</option>
+                      </select>
                       <input
                         placeholder={`Nome completo do passageiro ${i + 2}`}
                         value={a.nome}

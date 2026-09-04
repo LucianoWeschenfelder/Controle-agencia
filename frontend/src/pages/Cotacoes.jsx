@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import CotacaoForm from '../components/CotacaoForm';
 import {
-  listarCotacoes, criarCotacao, editarCotacao, alterarStatus, excluirCotacao,
+  listarCotacoes, criarCotacao, editarCotacao, alterarStatus, excluirCotacao, alterarDatas,
 } from '../api/cotacoes';
 import { buscarConfiguracoes } from '../api/configuracoes';
 import { listarAeroportos } from '../api/cadastros';
 import { listarFornecedores } from '../api/fornecedores';
-import OrigemMilhas from '../components/OrigemMilhas';
+import CompraTrechos from '../components/CompraTrechos';
 import { gerarPdf, gerarWord } from '../utils/orcamento';
 import { abrirWhatsApp, montarMensagem } from '../utils/whatsapp';
 import { formatarMoeda, formatarData, formatarNumero } from '../utils/formato';
@@ -96,6 +96,11 @@ function TabelaTrechos({ titulo, trechos }) {
 
 function CotacaoCard({ cotacao, config, aeroportos, fornecedores, onAtualizar, onEditar, onStatus, onExcluir }) {
   const [expandida, setExpandida] = useState(false);
+  const [editandoDatas, setEditandoDatas] = useState(false);
+  const [datas, setDatas] = useState({
+    data_envio: cotacao.data_envio || '',
+    data_venda: cotacao.data_venda || '',
+  });
 
   const todosTrechos = [...cotacao.trechos_ida, ...cotacao.trechos_volta];
   const totalOpcoes = todosTrechos.reduce((s, t) => s + t.opcoes.length, 0);
@@ -152,15 +157,52 @@ function CotacaoCard({ cotacao, config, aeroportos, fornecedores, onAtualizar, o
         </p>
       )}
 
-      {cotacao.data_envio && (
-        <p className="cotacao-envio">
-          Enviada em {formatarData(cotacao.data_envio)}
-          {cotacao.data_venda && ` · vendida em ${formatarData(cotacao.data_venda)}`}
-        </p>
+      {(cotacao.data_envio || cotacao.data_venda) && (
+        editandoDatas ? (
+          <div className="datas-editar">
+            <label>
+              Data do envio
+              <input
+                type="date"
+                value={datas.data_envio}
+                onChange={(e) => setDatas({ ...datas, data_envio: e.target.value })}
+              />
+            </label>
+            <label>
+              Data da venda
+              <input
+                type="date"
+                value={datas.data_venda}
+                onChange={(e) => setDatas({ ...datas, data_venda: e.target.value })}
+              />
+            </label>
+            <button className="btn-mini cancelar" onClick={() => setEditandoDatas(false)}>
+              Cancelar
+            </button>
+            <button
+              className="btn-mini destaque"
+              onClick={async () => {
+                await alterarDatas(cotacao.id, datas);
+                setEditandoDatas(false);
+                onAtualizar();
+              }}
+            >
+              Salvar datas
+            </button>
+          </div>
+        ) : (
+          <p className="cotacao-envio">
+            {cotacao.data_envio && `Enviada em ${formatarData(cotacao.data_envio)}`}
+            {cotacao.data_venda && ` · vendida em ${formatarData(cotacao.data_venda)}`}
+            <button className="btn-link" onClick={() => setEditandoDatas(true)}>
+              alterar datas
+            </button>
+          </p>
+        )
       )}
 
       {cotacao.status === 'vendida' && (
-        <OrigemMilhas
+        <CompraTrechos
           cotacao={cotacao}
           fornecedores={fornecedores}
           onAtualizar={onAtualizar}

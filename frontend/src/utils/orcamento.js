@@ -46,38 +46,64 @@ function prepararSentido(trechos) {
   const comEscolha = trechos.filter((t) => t.opcao_escolhida);
   if (!comEscolha.length) return null;
 
-  const voos = comEscolha.map((t) => {
+  /*
+   * Cada trecho pode ter mais de um voo (conexão vinculada). Aqui todos são
+   * achatados numa lista única, guardando de qual trecho vieram para saber
+   * se a conexão seguinte é vinculada ou não.
+   */
+  const voos = comEscolha.flatMap((t, iTrecho) => {
     const o = t.opcao_escolhida;
 
-    const viraODia = chegaNoDiaSeguinte(o.hora_saida, o.hora_chegada);
-    const dataChegada = viraODia ? somarDias(t.data, 1) : t.data;
+    const lista = o.voos?.length
+      ? o.voos
+      : [{
+          origem: t.origem,
+          destino: t.destino,
+          data: t.data,
+          hora_saida: o.hora_saida,
+          hora_chegada: o.hora_chegada,
+          numero_voo: o.numero_voo,
+          duracao_min: o.duracao_min,
+        }];
 
-    // Duração informada manualmente tem prioridade (voo internacional muda de fuso)
-    const automatica = minutosEntre(t.data, o.hora_saida, t.data, o.hora_chegada);
-    const duracao = o.duracao_min != null && o.duracao_min !== '' ? Number(o.duracao_min) : automatica;
+    return lista.map((v) => {
+      const data = v.data || t.data;
+      const viraODia = chegaNoDiaSeguinte(v.hora_saida, v.hora_chegada);
 
-    return {
-      trecho: t,
-      opcao: o,
-      dataSaida: t.data,
-      dataChegada,
-      viraODia,
-      duracao,
-    };
+      const automatica = minutosEntre(data, v.hora_saida, data, v.hora_chegada);
+      const duracao =
+        v.duracao_min != null && v.duracao_min !== '' ? Number(v.duracao_min) : automatica;
+
+      return {
+        iTrecho,
+        cia: o.cia,
+        classe: o.classe,
+        origem: v.origem || t.origem,
+        destino: v.destino || t.destino,
+        numero_voo: v.numero_voo,
+        hora_saida: v.hora_saida,
+        hora_chegada: v.hora_chegada,
+        dataSaida: data,
+        dataChegada: viraODia ? somarDias(data, 1) : data,
+        viraODia,
+        duracao,
+      };
+    });
   });
 
-  // Conexão: entre a chegada de um voo e a saída do seguinte
+  // Conexão entre um voo e o seguinte
   const conexoes = voos.slice(0, -1).map((v, i) => {
     const proximo = voos[i + 1];
+
     return {
-      sigla: v.trecho.destino,
+      sigla: v.destino,
       minutos: minutosEntre(
-        v.dataChegada, v.opcao.hora_chegada,
-        proximo.dataSaida || v.dataChegada, proximo.opcao.hora_saida
+        v.dataChegada, v.hora_chegada,
+        proximo.dataSaida || v.dataChegada, proximo.hora_saida
       ),
-      // Companhias diferentes = bilhetes separados, bagagem não segue direto
+      // Trechos diferentes com companhias diferentes = bilhetes separados
       naoVinculada: Boolean(
-        v.opcao.cia && proximo.opcao.cia && v.opcao.cia !== proximo.opcao.cia
+        v.iTrecho !== proximo.iTrecho && v.cia && proximo.cia && v.cia !== proximo.cia
       ),
     };
   });
@@ -98,8 +124,8 @@ function blocoSentido(sentido, rotulo, aeroportos) {
 
   const { voos, conexoes, somaVoos, somaConexoes, total } = sentido;
 
-  const origem = voos[0].trecho.origem;
-  const destino = voos[voos.length - 1].trecho.destino;
+  const origem = voos[0].origem;
+  const destino = voos[voos.length - 1].destino;
   const qtdConexoes = conexoes.length;
 
   const etiquetaConexao =
@@ -109,8 +135,6 @@ function blocoSentido(sentido, rotulo, aeroportos) {
 
   const linhas = voos
     .map((v, i) => {
-      const o = v.opcao;
-
       const marcaChegada = v.viraODia ? '<sup>+1</sup>' : '';
       const datasVoo = v.viraODia
         ? `${dataCurta(v.dataSaida)} → ${dataCurta(v.dataChegada)}`
@@ -119,19 +143,18 @@ function blocoSentido(sentido, rotulo, aeroportos) {
       const voo = `
         <div class="voo">
           <div class="voo-horas">
-            <div class="horas">${o.hora_saida || ''} → ${o.hora_chegada || ''}${marcaChegada}</div>
+            <div class="horas">${v.hora_saida || ''} → ${v.hora_chegada || ''}${marcaChegada}</div>
             <div class="voo-datas">${datasVoo}</div>
           </div>
           <div class="voo-rota">
-            <div class="rota-siglas">${v.trecho.origem || ''} <span class="seta">→</span> ${v.trecho.destino || ''}</div>
+            <div class="rota-siglas">${v.origem || ''} <span class="seta">→</span> ${v.destino || ''}</div>
             <div class="voo-numero">
-              ${o.numero_voo ? `Voo ${o.numero_voo}` : ''}${o.numero_voo && o.cia ? ' • ' : ''}${o.cia ? `Operado por ${o.cia}` : ''}
+              ${v.numero_voo ? `Voo ${v.numero_voo}` : ''}${v.numero_voo && v.cia ? ' • ' : ''}${v.cia ? `Operado por ${v.cia}` : ''}
             </div>
           </div>
           <div class="voo-info">
             ${v.duracao !== null ? `<div><strong>Duração:</strong> ${formatarDuracao(v.duracao)}</div>` : ''}
-            ${o.classe ? `<div><strong>Classe:</strong> ${o.classe}</div>` : ''}
-            ${o.aeronave ? `<div><strong>Aeronave:</strong> ${o.aeronave}</div>` : ''}
+            ${v.classe ? `<div><strong>Classe:</strong> ${v.classe}</div>` : ''}
           </div>
         </div>
       `;
@@ -235,8 +258,8 @@ export function gerarHtmlOrcamento(cotacao, config, aeroportos = []) {
   const ida = prepararSentido(cotacao.trechos_ida);
   const volta = prepararSentido(cotacao.trechos_volta);
 
-  const origemGeral = ida ? ida.voos[0].trecho.origem : cotacao.origem;
-  const destinoGeral = ida ? ida.voos[ida.voos.length - 1].trecho.destino : cotacao.destino;
+  const origemGeral = ida ? ida.voos[0].origem : cotacao.origem;
+  const destinoGeral = ida ? ida.voos[ida.voos.length - 1].destino : cotacao.destino;
 
   const pagamento = calcularPagamento(cotacao, config);
   const passageiros = cotacao.passageiros || 1;
@@ -282,7 +305,8 @@ export function gerarHtmlOrcamento(cotacao, config, aeroportos = []) {
   .cabecalho-dados { flex: 1; display: flex; flex-direction: column; justify-content: center;
     align-items: flex-end; text-align: right; padding: 0 20px;
     font-family: 'Montserrat', Arial, Helvetica, sans-serif;
-    font-size: 19px; font-weight: 400; line-height: 1.7; color: #1a2436; }
+    font-size: 17px; font-weight: 400; line-height: 1.45; color: #1a2436; }
+  .cabecalho-dados > div { margin-bottom: 2px; }
   .cabecalho-dados strong { color: #14243f; font-weight: 700; }
 
   .resumo { background: #1d3053; color: white; text-align: center; padding: 12px; font-size: 14px; line-height: 1.5; }

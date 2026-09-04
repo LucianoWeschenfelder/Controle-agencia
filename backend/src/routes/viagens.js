@@ -60,8 +60,12 @@ function montarUnidades(cotacao) {
       const primeiro = grupo[0];
       const ultimo = grupo.at(-1);
 
-      const horaSaida = primeiro.opcao_escolhida.hora_saida;
-      const horaChegada = ultimo.opcao_escolhida.hora_chegada;
+      const voosPrimeiro = primeiro.opcao_escolhida.voos || [];
+      const voosUltimo = ultimo.opcao_escolhida.voos || [];
+
+      const horaSaida = voosPrimeiro[0]?.hora_saida || primeiro.opcao_escolhida.hora_saida;
+      const horaChegada =
+        voosUltimo.at(-1)?.hora_chegada || ultimo.opcao_escolhida.hora_chegada;
 
       const viraODia = horaSaida && horaChegada && horaChegada <= horaSaida;
       const dataChegada = viraODia ? somarDias(ultimo.data, 1) : ultimo.data;
@@ -77,18 +81,31 @@ function montarUnidades(cotacao) {
         destino: ultimo.destino,
         cia: primeiro.opcao_escolhida.cia,
         classe: primeiro.opcao_escolhida.classe,
-        voos: grupo.map((t) => ({
-          origem: t.origem,
-          destino: t.destino,
-          data: t.data,
-          hora_saida: t.opcao_escolhida.hora_saida,
-          hora_chegada: t.opcao_escolhida.hora_chegada,
-          numero_voo: t.opcao_escolhida.numero_voo,
-          cia: t.opcao_escolhida.cia,
-        })),
-        conexoes: grupo.length - 1,
+        // Um trecho pode ter mais de um voo (conexão vinculada dentro dele)
+        voos: grupo.flatMap((t) => {
+          const lista = t.opcao_escolhida.voos?.length
+            ? t.opcao_escolhida.voos
+            : [{
+                origem: t.origem,
+                destino: t.destino,
+                data: t.data,
+                hora_saida: t.opcao_escolhida.hora_saida,
+                hora_chegada: t.opcao_escolhida.hora_chegada,
+                numero_voo: t.opcao_escolhida.numero_voo,
+              }];
+
+          return lista.map((v) => ({
+            ...v,
+            cia: t.opcao_escolhida.cia,
+            classe: t.opcao_escolhida.classe,
+          }));
+        }),
         data: primeiro.data,
         hora_saida: horaSaida,
+        conexoes: grupo.reduce(
+          (soma, t) => soma + Math.max((t.opcao_escolhida.voos?.length || 1) - 1, 0),
+          0
+        ) + grupo.length - 1,
         data_chegada: dataChegada,
         hora_chegada: horaChegada,
         partida: momento(primeiro.data, horaSaida),
@@ -118,17 +135,27 @@ function cotacaoDe(cotacaoId) {
         'SELECT * FROM cotacao_trechos WHERE cotacao_id = ? AND sentido = ? ORDER BY ordem ASC'
       )
       .all(cotacaoId, sentido)
-      .map((t) => ({
-        ...t,
-        opcao_escolhida:
-          db
-            .prepare('SELECT * FROM cotacao_opcoes WHERE trecho_id = ? AND escolhida = 1')
-            .get(t.id) || null,
-      }));
+      .map((t) => {
+        const opcao = db
+          .prepare('SELECT * FROM cotacao_opcoes WHERE trecho_id = ? AND escolhida = 1')
+          .get(t.id);
+
+        if (!opcao) return { ...t, opcao_escolhida: null };
+
+        const voos = db
+          .prepare('SELECT * FROM cotacao_voos WHERE opcao_id = ? ORDER BY ordem ASC')
+          .all(opcao.id);
+
+        return { ...t, opcao_escolhida: { ...opcao, voos } };
+      });
   }
+
+  // Mesma regra usada nas rotas de cotação: ano + número
+  const ano = (cotacao.criado_em || '').slice(2, 4) || '00';
 
   return {
     ...cotacao,
+    referencia: `AG${ano}${String(cotacao.id).padStart(4, '0')}`,
     cliente,
     fornecedor,
     trechos_ida: trechosDe('ida'),
@@ -162,13 +189,33 @@ function salvarAcompanhantes(viagemId, lista = []) {
   db.prepare('DELETE FROM viagem_passageiros WHERE viagem_id = ?').run(viagemId);
 
   const inserir = db.prepare(
-    'INSERT INTO viagem_passageiros (viagem_id, ordem, nome, documento, data_nascimento) VALUES (?, ?, ?, ?, ?)'
+    `INSERT INTO viagem_passageiros (viagem_id, ordem, nome, documento, data_nascimento, tipo)
+     VALUES (?, ?, ?, ?, ?, ?)`
   );
 
   (lista || []).forEach((p, i) => {
     if (!p.nome?.trim()) return;
-    inserir.run(viagemId, i, p.nome.trim(), p.documento?.trim() || null, p.data_nascimento || null);
+
+    const tipo = ['adulto', 'crianca', 'bebe'].includes(p.tipo) ? p.tipo : 'adulto';
+
+    inserir.run(
+      viagemId, i, p.nome.trim(),
+      p.documento?.trim() || null, p.data_nascimento || null, tipo
+    );
   });
+}
+
+// Um localizador por unidade de check-in
+function salvarLocalizadores(viagemId, localizadores = {}) {
+  const salvar = db.prepare(
+    `INSERT INTO viagem_checkins (viagem_id, chave, localizador)
+     VALUES (?, ?, ?)
+     ON CONFLICT(viagem_id, chave) DO UPDATE SET localizador = excluded.localizador`
+  );
+
+  for (const [chave, valor] of Object.entries(localizadores || {})) {
+    salvar.run(viagemId, chave, valor?.trim().toUpperCase() || null);
+  }
 }
 
 function acompanhantesDe(viagemId) {
@@ -179,11 +226,20 @@ function acompanhantesDe(viagemId) {
 
 function checkinsDe(viagemId) {
   const linhas = db
-    .prepare('SELECT chave, feito, feito_em FROM viagem_checkins WHERE viagem_id = ?')
+    .prepare(
+      'SELECT chave, feito, feito_em, localizador, antecedencia FROM viagem_checkins WHERE viagem_id = ?'
+    )
     .all(viagemId);
 
   const mapa = {};
-  for (const l of linhas) mapa[l.chave] = { feito: Boolean(l.feito), feito_em: l.feito_em };
+  for (const l of linhas) {
+    mapa[l.chave] = {
+      feito: Boolean(l.feito),
+      feito_em: l.feito_em,
+      localizador: l.localizador,
+      antecedencia: l.antecedencia,
+    };
+  }
   return mapa;
 }
 
@@ -200,28 +256,43 @@ function montarLinhas(viagem) {
   const acompanhantes = acompanhantesDe(viagem.id);
 
   return unidades.map((unidade) => {
-    const registro = marcados[unidade.chave] || { feito: false, feito_em: null };
+    const registro = marcados[unidade.chave] || {
+      feito: false, feito_em: null, localizador: null, antecedencia: null,
+    };
+
+    // Sem valor próprio, o bloco usa a antecedência geral da viagem
+    const antecedencia = registro.antecedencia ?? viagem.antecedencia_checkin;
 
     const janela = unidade.partida
-      ? new Date(unidade.partida - viagem.antecedencia_checkin * 3600000)
+      ? new Date(unidade.partida - antecedencia * 3600000)
+      : null;
+
+    // Endereço do check-in da companhia que opera este bloco
+    const cia = unidade.cia
+      ? db.prepare('SELECT * FROM cias WHERE UPPER(nome) = UPPER(?)').get(unidade.cia)
       : null;
 
     return {
       id: `${viagem.id}:${unidade.chave}`,
       viagem_id: viagem.id,
       chave: unidade.chave,
-      etapa: calcularEtapa(unidade, unidades, viagem, registro.feito),
+      etapa: calcularEtapa(unidade, unidades, { antecedencia_checkin: antecedencia }, registro.feito),
       checkin_feito: registro.feito,
       checkin_feito_em: registro.feito_em,
       checkin_libera_em: janela ? janela.toISOString() : null,
-      antecedencia_checkin: viagem.antecedencia_checkin,
-      localizador: viagem.localizador,
+      antecedencia_checkin: antecedencia,
+      url_checkin: cia?.url_checkin || null,
+      // Voo separado tem reserva própria, então o localizador é por unidade
+      localizador: registro.localizador || viagem.localizador,
       observacoes: viagem.observacoes,
       cliente: cotacao.cliente,
       acompanhantes,
       referencia: cotacao.referencia,
       tipo_viagem: cotacao.tipo_viagem,
       passageiros: cotacao.passageiros,
+      adultos: cotacao.adultos,
+      criancas: cotacao.criancas,
+      bebes: cotacao.bebes,
       data_venda: cotacao.data_venda,
       preco_venda: cotacao.preco_venda,
       origem_milhas: cotacao.origem_milhas,
@@ -243,6 +314,9 @@ function resumoDaCotacao(cotacaoId) {
     cliente: cotacao.cliente,
     tipo_viagem: cotacao.tipo_viagem,
     passageiros: cotacao.passageiros,
+    adultos: cotacao.adultos,
+    criancas: cotacao.criancas,
+    bebes: cotacao.bebes,
     unidades,
   };
 }
@@ -303,6 +377,9 @@ router.get('/:id', (req, res) => {
     ...viagem,
     cliente: cotacao?.cliente || null,
     passageiros: cotacao?.passageiros || 1,
+    adultos: cotacao?.adultos ?? 1,
+    criancas: cotacao?.criancas ?? 0,
+    bebes: cotacao?.bebes ?? 0,
     acompanhantes: acompanhantesDe(viagem.id),
   });
 });
@@ -331,7 +408,9 @@ router.post('/', (req, res) => {
     )
     .run(cotacao_id, horas, localizador?.trim() || null, observacoes?.trim() || null);
 
-  salvarAcompanhantes(Number(r.lastInsertRowid), req.body.acompanhantes);
+  const viagemId = Number(r.lastInsertRowid);
+  salvarAcompanhantes(viagemId, req.body.acompanhantes);
+  salvarLocalizadores(viagemId, req.body.localizadores);
 
   res.status(201).json(
     montarLinhas(db.prepare('SELECT * FROM viagens WHERE id = ?').get(Number(r.lastInsertRowid)))
@@ -357,6 +436,10 @@ router.put('/:id', (req, res) => {
     salvarAcompanhantes(Number(req.params.id), req.body.acompanhantes);
   }
 
+  if (req.body.localizadores) {
+    salvarLocalizadores(Number(req.params.id), req.body.localizadores);
+  }
+
   res.json(montarLinhas(db.prepare('SELECT * FROM viagens WHERE id = ?').get(req.params.id)));
 });
 
@@ -374,6 +457,78 @@ router.patch('/:id/checkin', (req, res) => {
      VALUES (?, ?, ?, ?)
      ON CONFLICT(viagem_id, chave) DO UPDATE SET feito = excluded.feito, feito_em = excluded.feito_em`
   ).run(req.params.id, chave, feito ? 1 : 0, feito ? new Date().toISOString() : null);
+
+  res.json(montarLinhas(viagem));
+});
+
+// Localizador de uma unidade de check-in
+router.patch('/:id/localizador', (req, res) => {
+  const { chave, localizador } = req.body;
+  if (!chave) return res.status(400).json({ erro: 'Informe a unidade de check-in' });
+
+  const viagem = db.prepare('SELECT * FROM viagens WHERE id = ?').get(req.params.id);
+  if (!viagem) return res.status(404).json({ erro: 'Viagem não encontrada' });
+
+  db.prepare(
+    `INSERT INTO viagem_checkins (viagem_id, chave, localizador)
+     VALUES (?, ?, ?)
+     ON CONFLICT(viagem_id, chave) DO UPDATE SET localizador = excluded.localizador`
+  ).run(req.params.id, chave, localizador?.trim().toUpperCase() || null);
+
+  res.json(montarLinhas(viagem));
+});
+
+/*
+ * Ajustes do bloco: cada unidade tem seu prazo de check-in e sua reserva,
+ * porque companhias diferentes liberam em momentos diferentes.
+ */
+router.patch('/:id/bloco', (req, res) => {
+  const { chave, antecedencia, localizador } = req.body;
+  if (!chave) return res.status(400).json({ erro: 'Informe a unidade de check-in' });
+
+  const viagem = db.prepare('SELECT * FROM viagens WHERE id = ?').get(req.params.id);
+  if (!viagem) return res.status(404).json({ erro: 'Viagem não encontrada' });
+
+  const horas = [24, 48].includes(Number(antecedencia)) ? Number(antecedencia) : null;
+
+  db.prepare(
+    `INSERT INTO viagem_checkins (viagem_id, chave, antecedencia, localizador)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(viagem_id, chave)
+     DO UPDATE SET antecedencia = excluded.antecedencia, localizador = excluded.localizador`
+  ).run(req.params.id, chave, horas, localizador?.trim().toUpperCase() || null);
+
+  res.json(montarLinhas(viagem));
+});
+
+/*
+ * Horário de voo muda. Aqui os voos daquele bloco são corrigidos direto,
+ * inclusive os de uma conexão vinculada.
+ */
+router.patch('/:id/voos', (req, res) => {
+  const viagem = db.prepare('SELECT * FROM viagens WHERE id = ?').get(req.params.id);
+  if (!viagem) return res.status(404).json({ erro: 'Viagem não encontrada' });
+
+  const { voos } = req.body;
+  if (!Array.isArray(voos)) return res.status(400).json({ erro: 'Informe os voos' });
+
+  const atualizar = db.prepare(
+    `UPDATE cotacao_voos SET
+      origem = ?, destino = ?, data = ?, hora_saida = ?, hora_chegada = ?,
+      numero_voo = ?, duracao_min = ?
+     WHERE id = ? AND cotacao_id = ?`
+  );
+
+  for (const v of voos) {
+    if (!v.id) continue;
+
+    atualizar.run(
+      v.origem || null, v.destino || null, v.data || null,
+      v.hora_saida || null, v.hora_chegada || null, v.numero_voo || null,
+      v.duracao_min !== '' && v.duracao_min != null ? Number(v.duracao_min) : null,
+      v.id, viagem.cotacao_id
+    );
+  }
 
   res.json(montarLinhas(viagem));
 });

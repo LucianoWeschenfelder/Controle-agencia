@@ -16,20 +16,22 @@ function referenciaDe(cotacao) {
 }
 
 // Custo de uma opção de CIA (valor por passageiro, naquele trecho)
-function calcularOpcao(opcao) {
+function calcularOpcao(opcao, pagantes = 1) {
   const custoMilhas = (opcao.milhas / 1000) * opcao.valor_milheiro;
-  const custoTotal = custoMilhas + opcao.taxa + opcao.bagagem;
+  const porPassageiro = custoMilhas + opcao.taxa + opcao.bagagem;
 
   return {
     ...opcao,
     escolhida: Boolean(opcao.escolhida),
     custo_milhas: Number(custoMilhas.toFixed(2)),
-    custo_total: Number(custoTotal.toFixed(2)),
+    custo_total: Number(porPassageiro.toFixed(2)),
+    // Mesmo custo multiplicado pelos passageiros que pagam passagem
+    custo_todos: Number((porPassageiro * pagantes).toFixed(2)),
   };
 }
 
 // Monta os trechos de um sentido, cada um com suas opções de CIA
-function montarTrechos(cotacaoId, sentido) {
+function montarTrechos(cotacaoId, sentido, pagantes = 1) {
   const trechos = db
     .prepare('SELECT * FROM cotacao_trechos WHERE cotacao_id = ? AND sentido = ? ORDER BY ordem ASC')
     .all(cotacaoId, sentido);
@@ -37,14 +39,33 @@ function montarTrechos(cotacaoId, sentido) {
   const opcoes = db
     .prepare('SELECT * FROM cotacao_opcoes WHERE cotacao_id = ? ORDER BY id ASC')
     .all(cotacaoId)
-    .map(calcularOpcao);
+    .map((o) => calcularOpcao(o, pagantes));
+
+  const voos = db
+    .prepare('SELECT * FROM cotacao_voos WHERE cotacao_id = ? ORDER BY ordem ASC')
+    .all(cotacaoId);
+
+  const compras = db
+    .prepare('SELECT * FROM cotacao_compras WHERE cotacao_id = ? AND sentido = ?')
+    .all(cotacaoId, sentido);
 
   return trechos.map((trecho) => {
-    const doTrecho = opcoes.filter((o) => o.trecho_id === trecho.id);
+    const doTrecho = opcoes
+      .filter((o) => o.trecho_id === trecho.id)
+      .map((o) => ({ ...o, voos: voos.filter((v) => v.opcao_id === o.id) }));
+    const compra = compras.find((c) => c.ordem === trecho.ordem) || null;
+
+    const fornecedor = compra?.fornecedor_id
+      ? db.prepare('SELECT * FROM fornecedores WHERE id = ?').get(compra.fornecedor_id)
+      : null;
+
     return {
       ...trecho,
       opcoes: doTrecho,
       opcao_escolhida: doTrecho.find((o) => o.escolhida) || null,
+      origem_milhas: compra?.origem_milhas || null,
+      fornecedor_id: compra?.fornecedor_id || null,
+      fornecedor,
     };
   });
 }
@@ -71,8 +92,10 @@ function montarCotacao(cotacao) {
     )
     .all(cotacao.id);
 
-  const trechosIda = montarTrechos(cotacao.id, 'ida');
-  const trechosVolta = montarTrechos(cotacao.id, 'volta');
+  const pagantesDaCotacao = Math.max(contarPagantes(cotacao.adultos, cotacao.criancas), 1);
+
+  const trechosIda = montarTrechos(cotacao.id, 'ida', pagantesDaCotacao);
+  const trechosVolta = montarTrechos(cotacao.id, 'volta', pagantesDaCotacao);
 
   const custoIda = custoDoSentido(trechosIda);
   const custoVolta = custoDoSentido(trechosVolta);
@@ -140,8 +163,14 @@ function salvarTrechos(cotacaoId, trechos = [], sentido) {
   const inserirOpcao = db.prepare(
     `INSERT INTO cotacao_opcoes
       (cotacao_id, trecho_id, cia, classe, milhas, valor_milheiro, taxa, bagagem,
-       hora_saida, hora_chegada, numero_voo, aeronave, duracao_min, escolhida)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       hora_saida, hora_chegada, numero_voo, duracao_min, escolhida)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+
+  const inserirVoo = db.prepare(
+    `INSERT INTO cotacao_voos
+      (cotacao_id, opcao_id, ordem, origem, destino, data, hora_saida, hora_chegada, numero_voo, duracao_min)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
 
   (trechos || []).forEach((trecho, i) => {
@@ -153,16 +182,35 @@ function salvarTrechos(cotacaoId, trechos = [], sentido) {
     const trechoId = Number(r.lastInsertRowid);
 
     (trecho.opcoes || []).forEach((opcao) => {
-      inserirOpcao.run(
+      // O primeiro voo espelha os horários na própria opção, para consultas simples
+      const voos = (opcao.voos || []).filter((v) => v.hora_saida || v.hora_chegada || v.numero_voo);
+      const primeiro = voos[0] || {};
+
+      const numero = (valor) =>
+        valor !== '' && valor != null ? Number(valor) : null;
+
+      const r = inserirOpcao.run(
         cotacaoId, trechoId,
         opcao.cia || null, opcao.classe || null,
         Number(opcao.milhas) || 0, Number(opcao.valor_milheiro) || 0,
         Number(opcao.taxa) || 0, Number(opcao.bagagem) || 0,
-        opcao.hora_saida || null, opcao.hora_chegada || null, opcao.numero_voo || null,
-        opcao.aeronave || null,
-        opcao.duracao_min !== '' && opcao.duracao_min != null ? Number(opcao.duracao_min) : null,
+        primeiro.hora_saida || null, primeiro.hora_chegada || null, primeiro.numero_voo || null,
+        numero(primeiro.duracao_min),
         opcao.escolhida ? 1 : 0
       );
+
+      const opcaoId = Number(r.lastInsertRowid);
+
+      voos.forEach((v, i) => {
+        inserirVoo.run(
+          cotacaoId, opcaoId, i,
+          v.origem || trecho.origem || null,
+          v.destino || trecho.destino || null,
+          v.data || trecho.data || null,
+          v.hora_saida || null, v.hora_chegada || null, v.numero_voo || null,
+          numero(v.duracao_min)
+        );
+      });
     });
   });
 }
@@ -181,6 +229,7 @@ function salvarItens(cotacaoId, itens = []) {
 }
 
 function regravarTudo(cotacaoId, body) {
+  db.prepare('DELETE FROM cotacao_voos WHERE cotacao_id = ?').run(cotacaoId);
   db.prepare('DELETE FROM cotacao_opcoes WHERE cotacao_id = ?').run(cotacaoId);
   db.prepare('DELETE FROM cotacao_trechos WHERE cotacao_id = ?').run(cotacaoId);
 
@@ -207,10 +256,9 @@ function extrairDados(body) {
 
   const pagantes = contarPagantes(adultos, criancas);
 
-  const unitario =
-    body.preco_venda_unitario !== '' && body.preco_venda_unitario != null
-      ? Number(body.preco_venda_unitario)
-      : null;
+  // O preço de venda e o valor da internet são o total, para todos os passageiros
+  const total =
+    body.preco_venda !== '' && body.preco_venda != null ? Number(body.preco_venda) : null;
 
   return {
     cliente_id: body.cliente_id,
@@ -224,9 +272,10 @@ function extrairDados(body) {
     valor_internet:
       body.valor_internet !== '' && body.valor_internet != null
         ? Number(body.valor_internet) : null,
-    preco_venda_unitario: unitario,
-    // O total cobrado é o valor por passageiro vezes os pagantes (bebê não paga)
-    preco_venda: unitario !== null ? Number((unitario * Math.max(pagantes, 1)).toFixed(2)) : null,
+    preco_venda: total,
+    // Guardado só para exibição: quanto sai por passageiro pagante
+    preco_venda_unitario:
+      total !== null ? Number((total / Math.max(pagantes, 1)).toFixed(2)) : null,
     observacoes: body.observacoes || null,
     bagagem_mao: Number(body.bagagem_mao) || 0,
     bagagem_despachada: Number(body.bagagem_despachada) || 0,
@@ -377,22 +426,52 @@ router.patch('/:id/status', (req, res) => {
  * milhas próprias. Só faz sentido depois da cotação ser vendida.
  */
 router.patch('/:id/fornecedor', (req, res) => {
-  const { origem_milhas, fornecedor_id } = req.body;
-
   const cotacao = db.prepare('SELECT * FROM cotacoes WHERE id = ?').get(req.params.id);
   if (!cotacao) return res.status(404).json({ erro: 'Cotação não encontrada' });
 
-  if (origem_milhas && !['proprio', 'fornecedor'].includes(origem_milhas)) {
-    return res.status(400).json({ erro: 'Origem das milhas inválida' });
+  const { compras } = req.body;
+  if (!Array.isArray(compras)) {
+    return res.status(400).json({ erro: 'Informe os trechos comprados' });
   }
 
-  if (origem_milhas === 'fornecedor' && !fornecedor_id) {
-    return res.status(400).json({ erro: 'Escolha o fornecedor' });
+  const salvar = db.prepare(
+    `INSERT INTO cotacao_compras (cotacao_id, sentido, ordem, origem_milhas, fornecedor_id)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(cotacao_id, sentido, ordem)
+     DO UPDATE SET origem_milhas = excluded.origem_milhas, fornecedor_id = excluded.fornecedor_id`
+  );
+
+  for (const c of compras) {
+    if (!['ida', 'volta'].includes(c.sentido)) continue;
+
+    if (c.origem_milhas && !['propria', 'fornecedor'].includes(c.origem_milhas)) {
+      return res.status(400).json({ erro: 'Origem da compra inválida' });
+    }
+
+    if (c.origem_milhas === 'fornecedor' && !c.fornecedor_id) {
+      return res.status(400).json({ erro: 'Escolha o fornecedor do trecho' });
+    }
+
+    salvar.run(
+      req.params.id,
+      c.sentido,
+      Number(c.ordem) || 0,
+      c.origem_milhas || null,
+      c.origem_milhas === 'fornecedor' ? c.fornecedor_id : null
+    );
   }
 
-  db.prepare('UPDATE cotacoes SET origem_milhas = ?, fornecedor_id = ? WHERE id = ?').run(
-    origem_milhas || null,
-    origem_milhas === 'fornecedor' ? fornecedor_id : null,
+  res.json(montarCotacao(db.prepare('SELECT * FROM cotacoes WHERE id = ?').get(req.params.id)));
+});
+
+// Correção manual das datas de envio e de venda
+router.patch('/:id/datas', (req, res) => {
+  const cotacao = db.prepare('SELECT * FROM cotacoes WHERE id = ?').get(req.params.id);
+  if (!cotacao) return res.status(404).json({ erro: 'Cotação não encontrada' });
+
+  db.prepare('UPDATE cotacoes SET data_envio = ?, data_venda = ? WHERE id = ?').run(
+    req.body.data_envio || null,
+    req.body.data_venda || null,
     req.params.id
   );
 
@@ -403,9 +482,11 @@ router.delete('/:id', (req, res) => {
   const existente = db.prepare('SELECT * FROM cotacoes WHERE id = ?').get(req.params.id);
   if (!existente) return res.status(404).json({ erro: 'Cotação não encontrada' });
 
+  db.prepare('DELETE FROM cotacao_voos WHERE cotacao_id = ?').run(req.params.id);
   db.prepare('DELETE FROM cotacao_opcoes WHERE cotacao_id = ?').run(req.params.id);
   db.prepare('DELETE FROM cotacao_trechos WHERE cotacao_id = ?').run(req.params.id);
   db.prepare('DELETE FROM cotacao_itens WHERE cotacao_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM cotacao_compras WHERE cotacao_id = ?').run(req.params.id);
   db.prepare('DELETE FROM cotacoes WHERE id = ?').run(req.params.id);
   res.status(204).send();
 });

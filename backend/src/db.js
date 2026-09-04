@@ -56,6 +56,26 @@ db.exec(`
 `);
 
 // Um trecho é uma perna da viagem (POA -> GRU). A ida pode ter vários.
+/*
+ * Voos de uma opção. Um trecho comercial (POA -> REC) pode ser operado em
+ * mais de um voo pela mesma companhia, com conexão vinculada no meio.
+ */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS cotacao_voos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cotacao_id INTEGER NOT NULL,
+    opcao_id INTEGER NOT NULL,
+    ordem INTEGER NOT NULL DEFAULT 0,
+    origem TEXT,
+    destino TEXT,
+    data TEXT,
+    hora_saida TEXT,
+    hora_chegada TEXT,
+    numero_voo TEXT,
+    duracao_min INTEGER
+  );
+`);
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS cotacao_trechos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -116,6 +136,23 @@ db.exec(`
   );
 `);
 
+/*
+ * De onde veio cada trecho comprado. Guardado por sentido + ordem em vez de
+ * pelo id do trecho, porque os trechos são recriados a cada salvamento da
+ * cotação e o fornecedor é definido depois, na venda.
+ */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS cotacao_compras (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cotacao_id INTEGER NOT NULL,
+    sentido TEXT NOT NULL,
+    ordem INTEGER NOT NULL,
+    origem_milhas TEXT,
+    fornecedor_id INTEGER,
+    UNIQUE (cotacao_id, sentido, ordem)
+  );
+`);
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS cotacao_itens (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -135,11 +172,20 @@ db.exec(`
   );
 `);
 
+// Classes de voo, para o campo virar lista em vez de texto livre
+db.exec(`
+  CREATE TABLE IF NOT EXISTS classes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome TEXT NOT NULL UNIQUE
+  );
+`);
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS cias (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     nome TEXT NOT NULL UNIQUE,
-    codigo TEXT
+    codigo TEXT,
+    url_checkin TEXT
   );
 `);
 
@@ -231,6 +277,18 @@ garantirColuna('cotacoes', 'fornecedor_id', 'INTEGER');
 garantirColuna('cotacoes', 'bagagem_mao', 'INTEGER NOT NULL DEFAULT 0');
 garantirColuna('cotacoes', 'bagagem_despachada', 'INTEGER NOT NULL DEFAULT 0');
 
+// Localizador por unidade de check-in: voo separado tem reserva própria
+garantirColuna('viagem_checkins', 'localizador', 'TEXT');
+
+// Cada companhia libera o check-in num prazo, então a antecedência é por bloco
+garantirColuna('viagem_checkins', 'antecedencia', 'INTEGER');
+
+// Endereço do check-in de cada companhia, para abrir direto pelo sistema
+garantirColuna('cias', 'url_checkin', 'TEXT');
+
+// Cada acompanhante precisa dizer se é adulto, criança ou bebê
+garantirColuna('viagem_passageiros', 'tipo', "TEXT NOT NULL DEFAULT 'adulto'");
+
 garantirColuna('cotacao_opcoes', 'cia', 'TEXT');
 garantirColuna('cotacao_opcoes', 'classe', 'TEXT');
 garantirColuna('cotacao_opcoes', 'trecho_id', 'INTEGER NOT NULL DEFAULT 0');
@@ -259,6 +317,93 @@ if (colunasViagem.includes('checkin_ida')) {
   }
 
   if (migrados) console.log(`[migração] ${migrados} check-in(s) movidos para a nova tabela`);
+}
+
+/*
+ * O fornecedor era único para a cotação inteira. Agora é por trecho, então
+ * o que já estava definido passa a valer para todos os trechos.
+ */
+const comFornecedorAntigo = db
+  .prepare(
+    `SELECT c.id, c.origem_milhas, c.fornecedor_id FROM cotacoes c
+     LEFT JOIN cotacao_compras cc ON cc.cotacao_id = c.id
+     WHERE c.origem_milhas IS NOT NULL AND cc.id IS NULL`
+  )
+  .all();
+
+if (comFornecedorAntigo.length) {
+  const inserirCompra = db.prepare(
+    `INSERT OR IGNORE INTO cotacao_compras (cotacao_id, sentido, ordem, origem_milhas, fornecedor_id)
+     VALUES (?, ?, ?, ?, ?)`
+  );
+
+  for (const c of comFornecedorAntigo) {
+    const trechos = db
+      .prepare('SELECT sentido, ordem FROM cotacao_trechos WHERE cotacao_id = ?')
+      .all(c.id);
+
+    for (const t of trechos) {
+      inserirCompra.run(c.id, t.sentido, t.ordem, c.origem_milhas, c.fornecedor_id);
+    }
+  }
+
+  console.log(`[migração] fornecedor replicado nos trechos de ${comFornecedorAntigo.length} cotação(ões)`);
+}
+
+// O localizador da viagem passa a valer para cada unidade de check-in
+const semLocalizador = db
+  .prepare(
+    `SELECT vc.id, v.localizador FROM viagem_checkins vc
+     JOIN viagens v ON v.id = vc.viagem_id
+     WHERE vc.localizador IS NULL AND v.localizador IS NOT NULL`
+  )
+  .all();
+
+if (semLocalizador.length) {
+  const atualizar = db.prepare('UPDATE viagem_checkins SET localizador = ? WHERE id = ?');
+  for (const l of semLocalizador) atualizar.run(l.localizador, l.id);
+  console.log(`[migração] localizador copiado para ${semLocalizador.length} check-in(s)`);
+}
+
+/*
+ * Os horários ficavam direto na opção. Agora cada opção tem uma lista de
+ * voos, para comportar conexão vinculada dentro do mesmo trecho.
+ */
+const opcoesSemVoo = db
+  .prepare(
+    `SELECT o.id, o.cotacao_id, o.hora_saida, o.hora_chegada, o.numero_voo, o.duracao_min,
+            t.origem, t.destino, t.data
+     FROM cotacao_opcoes o
+     JOIN cotacao_trechos t ON t.id = o.trecho_id
+     LEFT JOIN cotacao_voos v ON v.opcao_id = o.id
+     WHERE v.id IS NULL AND o.hora_saida IS NOT NULL`
+  )
+  .all();
+
+if (opcoesSemVoo.length) {
+  const inserirVoo = db.prepare(
+    `INSERT INTO cotacao_voos
+      (cotacao_id, opcao_id, ordem, origem, destino, data, hora_saida, hora_chegada, numero_voo, duracao_min)
+     VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?, ?)`
+  );
+
+  for (const o of opcoesSemVoo) {
+    inserirVoo.run(
+      o.cotacao_id, o.id, o.origem, o.destino, o.data,
+      o.hora_saida, o.hora_chegada, o.numero_voo, o.duracao_min
+    );
+  }
+
+  console.log(`[migração] ${opcoesSemVoo.length} voo(s) movidos para a tabela própria`);
+}
+
+// Classes que já foram digitadas viram registro, para aparecerem na lista
+const classesDigitadas = db
+  .prepare("SELECT DISTINCT classe FROM cotacao_opcoes WHERE classe IS NOT NULL AND TRIM(classe) <> ''")
+  .all();
+
+for (const { classe } of classesDigitadas) {
+  db.prepare('INSERT OR IGNORE INTO classes (nome) VALUES (?)').run(classe.trim());
 }
 
 /*
@@ -407,6 +552,31 @@ if (totalAeroportos === 0) {
   for (const [sigla, cidade] of iniciais) {
     inserirCidade.run(cidade);
     inserirAeroporto.run(sigla, buscarCidade.get(cidade).id);
+  }
+}
+
+// Endereços de check-in conhecidos, aplicados a quem ainda não tem
+const CHECKIN_CONHECIDOS = {
+  Azul: 'https://www.voeazul.com.br/br/pt/home/azulwebcheckin',
+  GOL: 'https://b2c.voegol.com.br/check-in',
+  LATAM: 'https://www.latamairlines.com/br/pt/check-in',
+};
+
+const definirCheckin = db.prepare(
+  'UPDATE cias SET url_checkin = ? WHERE UPPER(nome) = UPPER(?) AND url_checkin IS NULL'
+);
+
+for (const [nome, url] of Object.entries(CHECKIN_CONHECIDOS)) {
+  definirCheckin.run(url, nome);
+}
+
+// Classes iniciais
+const totalClasses = db.prepare('SELECT COUNT(*) AS total FROM classes').get().total;
+
+if (totalClasses === 0) {
+  const inserirClasse = db.prepare('INSERT OR IGNORE INTO classes (nome) VALUES (?)');
+  for (const nome of ['Econômica', 'Econômica Premium', 'Executiva', 'Primeira Classe']) {
+    inserirClasse.run(nome);
   }
 }
 

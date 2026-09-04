@@ -8,7 +8,7 @@ router.get('/', (req, res) => {
 });
 
 router.post('/', (req, res) => {
-  const { nome, codigo } = req.body;
+  const { nome, codigo, url_checkin } = req.body;
 
   if (!nome || !nome.trim()) {
     return res.status(400).json({ erro: 'Informe o nome da companhia' });
@@ -21,12 +21,25 @@ router.post('/', (req, res) => {
   if (jaExiste) return res.status(200).json(jaExiste);
 
   const r = db
-    .prepare('INSERT INTO cias (nome, codigo) VALUES (?, ?)')
-    .run(nome.trim(), codigo?.trim() || null);
+    .prepare('INSERT INTO cias (nome, codigo, url_checkin) VALUES (?, ?, ?)')
+    .run(nome.trim(), codigo?.trim() || null, url_checkin?.trim() || null);
 
   res.status(201).json(
     db.prepare('SELECT * FROM cias WHERE id = ?').get(Number(r.lastInsertRowid))
   );
+});
+
+router.put('/:id', (req, res) => {
+  const { nome, codigo, url_checkin } = req.body;
+  if (!nome?.trim()) return res.status(400).json({ erro: 'Informe o nome da companhia' });
+
+  const existente = db.prepare('SELECT * FROM cias WHERE id = ?').get(req.params.id);
+  if (!existente) return res.status(404).json({ erro: 'Companhia não encontrada' });
+
+  db.prepare('UPDATE cias SET nome = ?, codigo = ?, url_checkin = ? WHERE id = ?')
+    .run(nome.trim(), codigo?.trim() || null, url_checkin?.trim() || null, req.params.id);
+
+  res.json(db.prepare('SELECT * FROM cias WHERE id = ?').get(req.params.id));
 });
 
 router.delete('/:id', (req, res) => {

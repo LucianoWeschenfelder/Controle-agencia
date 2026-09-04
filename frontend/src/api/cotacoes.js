@@ -61,3 +61,13 @@ export async function definirFornecedor(id, dados) {
     })
   );
 }
+
+export async function alterarDatas(id, dados) {
+  return tratarResposta(
+    await fetch(`${BASE_URL}/${id}/datas`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(dados),
+    })
+  );
+}

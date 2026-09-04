@@ -40,7 +40,7 @@ A cotação é dividida em três abas:
 
 **Aba Cotação** — dados da viagem (cliente, origem, destino, tipo, datas, passageiros) e os trechos com as opções de companhia. A ida pode ser montada por vários trechos, cada um com sua CIA, então POA→GRU pode ser uma companhia e GRU→MAO outra. O destino de um trecho vira automaticamente a origem do seguinte.
 
-**Aba Dados do voo** — só o que não dá para saber pela cotação: horário de saída e chegada, nº do voo, classe, aeronave e duração. Origem, destino, data e companhia já vêm da aba anterior. Quando dois trechos seguidos têm companhias diferentes, o sistema marca sozinho como "escala não vinculada". Também é aqui que se escolhe o que está incluído na tarifa.
+**Aba Dados do voo** — só o que não dá para saber pela cotação: horário de saída e chegada, nº do voo, classe (lista, com cadastro de novas) e duração. Um trecho pode ter mais de um voo: "Adicionar conexão neste trecho" inclui o voo seguinte da mesma companhia, formando uma escala vinculada. Origem, destino, data e companhia já vêm da aba anterior. Quando dois trechos seguidos têm companhias diferentes, o sistema marca sozinho como "escala não vinculada". Também é aqui que se escolhe o que está incluído na tarifa.
 
 **Aba Orçamento** — mostra o documento exatamente como o cliente vai receber, com os botões de gerar PDF e baixar Word.
 
@@ -52,7 +52,8 @@ Outros recursos:
 - Salvar como rascunho (permite ficar incompleto) ou salvar a cotação completa
 - Economia do cliente calculada sobre o preço da internet
 - Acompanhamento por situação: Em elaboração, Enviada, Vendida, Cancelada, com contador de dias desde o envio
-- Ao marcar como vendida, o sistema grava a data da venda e pede a origem das milhas: milhas próprias ou um fornecedor cadastrado
+- Ao marcar como vendida, o sistema grava a data da venda e pede a origem da compra de cada trecho: compra própria (milhas suas ou compra direto na companhia) ou um fornecedor cadastrado. Um atalho aplica a escolha do primeiro trecho a todos. No card fica só o resumo, que expande para mostrar trecho por trecho
+- Datas de envio e de venda podem ser corrigidas à mão no card
 - Pagamento: o preço de venda é o valor à vista no PIX; o valor no cartão é o preço de venda multiplicado por (1 + taxa), e a parcela é esse total dividido pelo número de parcelas. A taxa é informada em fração decimal (0,096495 = 9,6495%) e vale para aquele número de parcelas
 - O banco se atualiza sozinho na inicialização, sem precisar apagar o agencia.db
 
@@ -71,11 +72,15 @@ A lista é por unidade de check-in, não por viagem. Cada card é um check-in a 
 - A volta é sempre um card à parte, então marcar o check-in da ida não move a volta de etapa
 
 - Cadastro parte de uma cotação vendida. Cliente, telefone, e-mail, rota, datas e horários vêm dela automaticamente, e a tela mostra quais check-ins serão criados
-- Preenchimento manual: quantas horas antes do voo o check-in libera (24 ou 48), localizador e observações
+- Preenchimento manual: quantas horas antes do voo o check-in libera (24 ou 48), um localizador por reserva (voos separados têm reservas diferentes) e observações
+- Com mais de um passageiro, o cadastro já pede os acompanhantes na quantidade certa e com o tipo pré-selecionado (adulto, criança ou bebê), seguindo o que foi informado na cotação
 - A etapa não é gravada: o sistema calcula pela data do voo, pela antecedência escolhida e pelo check-in marcado, então cada card anda sozinho com o tempo
 - Cada card mostra em destaque o nome completo do passageiro titular, mais companhia, localizador e horário de saída — os dados pedidos no check-in
 - Quando a cotação tem mais de um passageiro, o cadastro pede os acompanhantes (nome, documento e nascimento). No card, um botão mostra a lista deles
-- Botão de editar para corrigir antecedência, localizador, observações e acompanhantes
+- "Editar bloco" altera só aquele check-in: a antecedência (companhias liberam em prazos diferentes), o localizador da reserva e os horários dos voos, inclusive os da conexão vinculada. Os demais blocos não são afetados
+- "Editar viagem" continua para o que é comum: observações e acompanhantes
+- O card mostra só o essencial: rota, passageiro, companhia, localizador, saída e quantidade. "Ver detalhes" abre o itinerário completo com as conexões, a liberação do check-in, os acompanhantes e os dados da venda
+- Botão que abre o site de check-in da companhia do bloco. O endereço fica cadastrado em cada companhia (Azul, GOL e LATAM já vêm preenchidas)
 - "Ver detalhes da venda" mostra data da venda, valor e de quem vieram as milhas, com botão de WhatsApp do fornecedor
 - O botão de check-in fica bloqueado até a companhia liberar (pela antecedência escolhida)
 - Botão de WhatsApp para falar com o cliente

@@ -1,12 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import ViagemForm from '../components/ViagemForm';
 import ViagemEditar from '../components/ViagemEditar';
+import EditarBloco from '../components/EditarBloco';
 import {
   listarViagens, criarViagem, editarViagem, marcarCheckin, excluirViagem,
+  salvarBloco, salvarVoos,
 } from '../api/viagens';
 import { buscarConfiguracoes } from '../api/configuracoes';
 import { abrirWhatsApp, montarMensagem } from '../utils/whatsapp';
 import { formatarData, formatarMoeda } from '../utils/formato';
+import { minutosEntre, formatarDuracao, dataDeChegada } from '../utils/tempo';
 
 const ETAPAS = [
   { id: 'aguardando_checkin', rotulo: 'Aguardando Check-in' },
@@ -36,16 +39,16 @@ function rotuloUnidade(unidade) {
   return `${base} · parte ${unidade.parte} de ${unidade.total_partes}`;
 }
 
-function LinhaCheckin({ linha, config, onCheckin, onAntecedencia, onEditar, onExcluir }) {
+function LinhaCheckin({ linha, config, onCheckin, onSalvarBloco, onEditar, onExcluir }) {
   const { unidade } = linha;
-  const [mostrarPassageiros, setMostrarPassageiros] = useState(false);
-  const [mostrarDetalhes, setMostrarDetalhes] = useState(false);
+  const [expandido, setExpandido] = useState(false);
+  const [editandoBloco, setEditandoBloco] = useState(false);
+
+  const dias = diasAte(unidade.data, unidade.hora_saida);
+  const liberaEm = linha.checkin_libera_em ? new Date(linha.checkin_libera_em) : null;
 
   // O check-in só pode ser marcado depois de liberado pela companhia
   const podeMarcar = linha.etapa === 'realizar_checkin' || linha.etapa === 'em_viagem';
-  const dias = diasAte(unidade.data, unidade.hora_saida);
-
-  const liberaEm = linha.checkin_libera_em ? new Date(linha.checkin_libera_em) : null;
 
   return (
     <div className="viagem-card">
@@ -61,42 +64,18 @@ function LinhaCheckin({ linha, config, onCheckin, onAntecedencia, onEditar, onEx
           {linha.etapa !== 'concluido' && (
             <span className="etiqueta-dias dias-ok">{textoDias(dias)}</span>
           )}
-          <span className="viagem-ref">{linha.referencia}</span>
         </div>
       </div>
 
-      {/* Dados pedidos na hora de fazer o check-in */}
       <div className="passageiro-titular">
         <span>Passageiro</span>
         <strong>{linha.cliente?.nome || '—'}</strong>
         {linha.passageiros > 1 && (
-          <button
-            type="button"
-            className="btn-link"
-            onClick={() => setMostrarPassageiros(!mostrarPassageiros)}
-          >
-            {mostrarPassageiros
-              ? 'ocultar acompanhantes'
-              : `+ ${linha.passageiros - 1} acompanhante${linha.passageiros > 2 ? 's' : ''}`}
+          <button type="button" className="btn-link" onClick={() => setExpandido(!expandido)}>
+            + {linha.passageiros - 1} acompanhante{linha.passageiros > 2 ? 's' : ''}
           </button>
         )}
       </div>
-
-      {mostrarPassageiros && (
-        <div className="lista-acompanhantes">
-          {(linha.acompanhantes || []).length === 0 ? (
-            <p>Acompanhantes ainda não cadastrados. Use "Editar" para incluir.</p>
-          ) : (
-            (linha.acompanhantes || []).map((a) => (
-              <p key={a.id}>
-                {a.nome}
-                {a.documento && ` · ${a.documento}`}
-                {a.data_nascimento && ` · ${formatarData(a.data_nascimento)}`}
-              </p>
-            ))
-          )}
-        </div>
-      )}
 
       <div className="dados-checkin">
         <div>
@@ -119,71 +98,130 @@ function LinhaCheckin({ linha, config, onCheckin, onAntecedencia, onEditar, onEx
         </div>
       </div>
 
-      {linha.nao_vinculada && (
-        <p className="faixa-alerta">
-          Escala não vinculada — este trecho tem companhia própria e exige check-in separado.
-        </p>
-      )}
+      <button className="btn-link" onClick={() => setExpandido(!expandido)}>
+        {expandido ? 'ocultar detalhes' : 'ver detalhes'}
+      </button>
 
-      {unidade.conexoes > 0 && (
-        <p className="faixa-info">
-          Escala vinculada pela {unidade.cia}: um único check-in cobre{' '}
-          {unidade.voos.map((v) => `${v.origem}→${v.destino}`).join(' e ')}.
-        </p>
-      )}
+      {expandido && (
+        <div className="detalhes-expandidos">
+          {linha.nao_vinculada && (
+            <p className="faixa-alerta">
+              Escala não vinculada — este trecho tem companhia própria e exige check-in separado.
+            </p>
+          )}
 
-      {linha.etapa === 'aguardando_checkin' && liberaEm && (
-        <p className="faixa-info">
-          Check-in libera em {liberaEm.toLocaleDateString('pt-BR')} às{' '}
-          {liberaEm.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} (
-          {linha.antecedencia_checkin}h antes)
-        </p>
+          {unidade.conexoes > 0 && (
+            <p className="faixa-info">
+              Escala vinculada pela {unidade.cia}: um único check-in cobre o percurso.
+            </p>
+          )}
+
+          <div className="itinerario-bloco">
+            {unidade.voos.map((v, i) => {
+              const chegada = dataDeChegada(v.data, v.hora_saida, v.hora_chegada);
+              const proximo = unidade.voos[i + 1];
+
+              const escala = proximo
+                ? minutosEntre(chegada, v.hora_chegada, proximo.data || chegada, proximo.hora_saida)
+                : null;
+
+              return (
+                <div key={v.id ?? i}>
+                  <div className="itinerario-voo">
+                    <span className="itinerario-horas">
+                      {v.hora_saida || '--:--'} → {v.hora_chegada || '--:--'}
+                      {chegada && chegada !== v.data && <sup>+1</sup>}
+                    </span>
+                    <span className="itinerario-rota">
+                      {v.origem} → {v.destino}
+                    </span>
+                    <span className="itinerario-voo-num">
+                      {v.numero_voo || '—'} · {formatarData(v.data)}
+                    </span>
+                  </div>
+
+                  {escala !== null && (
+                    <p className="itinerario-escala">
+                      Conexão em {v.destino} · {formatarDuracao(escala)}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {linha.etapa === 'aguardando_checkin' && liberaEm && (
+            <p className="faixa-info">
+              Check-in libera em {liberaEm.toLocaleDateString('pt-BR')} às{' '}
+              {liberaEm.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} (
+              {linha.antecedencia_checkin}h antes)
+            </p>
+          )}
+
+          {linha.passageiros > 1 && (
+            <div className="lista-acompanhantes">
+              {(linha.acompanhantes || []).length === 0 ? (
+                <p>Acompanhantes ainda não cadastrados. Use "Editar viagem" para incluir.</p>
+              ) : (
+                (linha.acompanhantes || []).map((a) => (
+                  <p key={a.id}>
+                    <span className={`selo-tipo-passageiro ${a.tipo}`}>
+                      {a.tipo === 'bebe' ? 'Bebê' : a.tipo === 'crianca' ? 'Criança' : 'Adulto'}
+                    </span>
+                    {a.nome}
+                    {a.documento && ` · ${a.documento}`}
+                    {a.data_nascimento && ` · ${formatarData(a.data_nascimento)}`}
+                  </p>
+                ))
+              )}
+            </div>
+          )}
+
+          <div className="detalhes-venda">
+            <div>
+              <span>Data da venda</span>
+              <strong>{formatarData(linha.data_venda)}</strong>
+            </div>
+            <div>
+              <span>Valor da venda</span>
+              <strong>{formatarMoeda(linha.preco_venda)}</strong>
+            </div>
+            <div>
+              <span>Referência</span>
+              <strong>{linha.referencia}</strong>
+            </div>
+          </div>
+
+          {linha.observacoes && <p className="cotacao-obs">Obs: {linha.observacoes}</p>}
+        </div>
       )}
 
       {linha.etapa === 'realizar_checkin' && (
         <p className="faixa-alerta">Check-in liberado — faça agora e avise o cliente.</p>
       )}
 
-      <button className="btn-link" onClick={() => setMostrarDetalhes(!mostrarDetalhes)}>
-        {mostrarDetalhes ? 'ocultar detalhes da venda' : 'ver detalhes da venda'}
-      </button>
-
-      {mostrarDetalhes && (
-        <div className="detalhes-venda">
-          <div>
-            <span>Data da venda</span>
-            <strong>{formatarData(linha.data_venda)}</strong>
-          </div>
-          <div>
-            <span>Valor da venda</span>
-            <strong>{formatarMoeda(linha.preco_venda)}</strong>
-          </div>
-          <div>
-            <span>Milhas de</span>
-            <strong>
-              {linha.origem_milhas === 'proprio'
-                ? 'Milhas próprias'
-                : linha.fornecedor?.nome || 'não informado'}
-            </strong>
-            {linha.fornecedor?.whatsapp && (
-              <button
-                className="btn-mini"
-                onClick={() => abrirWhatsApp(linha.fornecedor.whatsapp, '')}
-              >
-                WhatsApp do fornecedor
-              </button>
-            )}
-          </div>
-          {linha.observacoes && (
-            <div className="campo-largo-auto">
-              <span>Observações</span>
-              <strong>{linha.observacoes}</strong>
-            </div>
-          )}
-        </div>
+      {editandoBloco && (
+        <EditarBloco
+          linha={linha}
+          onSalvar={async (l, dados) => {
+            await onSalvarBloco(l, dados);
+            setEditandoBloco(false);
+          }}
+          onCancelar={() => setEditandoBloco(false)}
+        />
       )}
 
       <div className="cotacao-acoes">
+        {linha.url_checkin && (
+          <button
+            className="btn btn-primario"
+            onClick={() => window.open(linha.url_checkin, '_blank')}
+            title={`Abrir o check-in da ${unidade.cia}`}
+          >
+            Check-in {unidade.cia}
+          </button>
+        )}
+
         {linha.checkin_feito ? (
           <button className="btn-mini preenchido" onClick={() => onCheckin(linha, false)}>
             ✓ Check-in feito
@@ -193,26 +231,15 @@ function LinhaCheckin({ linha, config, onCheckin, onAntecedencia, onEditar, onEx
             className={`btn-mini ${podeMarcar ? 'destaque' : ''}`}
             onClick={() => onCheckin(linha, true)}
             disabled={!podeMarcar}
-            title={
-              podeMarcar
-                ? ''
-                : 'O check-in ainda não foi liberado pela companhia'
-            }
+            title={podeMarcar ? '' : 'O check-in ainda não foi liberado pela companhia'}
           >
             {podeMarcar ? 'Marcar check-in' : '🔒 Check-in bloqueado'}
           </button>
         )}
 
-        <label className="antecedencia-inline">
-          Libera
-          <select
-            value={linha.antecedencia_checkin}
-            onChange={(e) => onAntecedencia(linha, Number(e.target.value))}
-          >
-            <option value={24}>24h antes</option>
-            <option value={48}>48h antes</option>
-          </select>
-        </label>
+        <button className="btn btn-secundario" onClick={() => setEditandoBloco(true)}>
+          Editar bloco
+        </button>
 
         <button
           className="btn btn-whatsapp"
@@ -227,7 +254,7 @@ function LinhaCheckin({ linha, config, onCheckin, onAntecedencia, onEditar, onEx
         </button>
 
         <button className="btn btn-secundario" onClick={() => onEditar(linha)}>
-          Editar
+          Editar viagem
         </button>
 
         <button className="btn btn-perigo" onClick={() => onExcluir(linha)}>
@@ -284,17 +311,19 @@ export default function Viagens() {
     }
   }
 
-  async function alterarAntecedencia(linha, horas) {
-    try {
-      await editarViagem(linha.viagem_id, {
-        antecedencia_checkin: horas,
-        localizador: linha.localizador,
-        observacoes: linha.observacoes,
-      });
-      carregar();
-    } catch (err) {
-      setErro(err.message);
+  // Salva os ajustes daquele bloco e, se algum horário mudou, também os voos
+  async function salvarBlocoCompleto(linha, dados) {
+    await salvarBloco(linha.viagem_id, {
+      chave: linha.chave,
+      antecedencia: dados.antecedencia,
+      localizador: dados.localizador,
+    });
+
+    if (dados.voos?.length) {
+      await salvarVoos(linha.viagem_id, dados.voos);
     }
+
+    carregar();
   }
 
   async function handleExcluir(linha) {
@@ -390,7 +419,7 @@ export default function Viagens() {
               linha={linha}
               config={config}
               onCheckin={alterarCheckin}
-              onAntecedencia={alterarAntecedencia}
+              onSalvarBloco={salvarBlocoCompleto}
               onEditar={(l) => {
                 setViagemEditando(l.viagem_id);
                 setModo('editar');
