@@ -34,6 +34,10 @@ db.exec(`
     data_ida TEXT,
     data_volta TEXT,
     passageiros INTEGER NOT NULL DEFAULT 1,
+    adultos INTEGER NOT NULL DEFAULT 1,
+    criancas INTEGER NOT NULL DEFAULT 0,
+    bebes INTEGER NOT NULL DEFAULT 0,
+    preco_venda_unitario REAL,
     valor_internet REAL,
     preco_venda REAL,
     opcao_ida_id INTEGER,
@@ -41,6 +45,9 @@ db.exec(`
     status TEXT NOT NULL DEFAULT 'elaboracao',
     data_envio TEXT,
     data_conclusao TEXT,
+    data_venda TEXT,
+    origem_milhas TEXT,
+    fornecedor_id INTEGER,
     bagagem_mao INTEGER NOT NULL DEFAULT 0,
     bagagem_despachada INTEGER NOT NULL DEFAULT 0,
     observacoes TEXT,
@@ -118,11 +125,65 @@ db.exec(`
   );
 `);
 
+// Quem forneceu as milhas da passagem
+db.exec(`
+  CREATE TABLE IF NOT EXISTS fornecedores (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome TEXT NOT NULL UNIQUE,
+    whatsapp TEXT,
+    observacoes TEXT
+  );
+`);
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS cias (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     nome TEXT NOT NULL UNIQUE,
     codigo TEXT
+  );
+`);
+
+// Viagem nasce de uma cotação vendida; guarda só o que a cotação não tem
+db.exec(`
+  CREATE TABLE IF NOT EXISTS viagens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cotacao_id INTEGER NOT NULL UNIQUE,
+    antecedencia_checkin INTEGER NOT NULL DEFAULT 24,
+    checkin_ida INTEGER NOT NULL DEFAULT 0,
+    checkin_ida_em TEXT,
+    checkin_volta INTEGER NOT NULL DEFAULT 0,
+    checkin_volta_em TEXT,
+    localizador TEXT,
+    observacoes TEXT,
+    criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`);
+
+/*
+ * Cada check-in é feito separadamente: a ida com escala vinculada é um só,
+ * mas escala não vinculada (companhias diferentes) e a volta são à parte.
+ * A chave identifica a unidade, no formato "ida-0", "ida-1", "volta-0".
+ */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS viagem_checkins (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    viagem_id INTEGER NOT NULL,
+    chave TEXT NOT NULL,
+    feito INTEGER NOT NULL DEFAULT 0,
+    feito_em TEXT,
+    UNIQUE (viagem_id, chave)
+  );
+`);
+
+// Acompanhantes da viagem. O titular é o cliente da cotação e não entra aqui.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS viagem_passageiros (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    viagem_id INTEGER NOT NULL,
+    ordem INTEGER NOT NULL DEFAULT 0,
+    nome TEXT NOT NULL,
+    documento TEXT,
+    data_nascimento TEXT
   );
 `);
 
@@ -149,10 +210,26 @@ function garantirColuna(tabela, coluna, definicao) {
   }
 }
 
+/*
+ * IMPORTANTE: todas as colunas precisam ser garantidas ANTES das migrações
+ * de dados abaixo, senão uma consulta que use coluna nova quebra em banco
+ * criado por versão anterior.
+ */
 garantirColuna('cotacoes', 'tipo_viagem', "TEXT NOT NULL DEFAULT 'ida_volta'");
 garantirColuna('cotacoes', 'passageiros', 'INTEGER NOT NULL DEFAULT 1');
 garantirColuna('cotacoes', 'opcao_ida_id', 'INTEGER');
 garantirColuna('cotacoes', 'opcao_volta_id', 'INTEGER');
+
+garantirColuna('cotacoes', 'data_conclusao', 'TEXT');
+garantirColuna('cotacoes', 'adultos', 'INTEGER NOT NULL DEFAULT 1');
+garantirColuna('cotacoes', 'criancas', 'INTEGER NOT NULL DEFAULT 0');
+garantirColuna('cotacoes', 'bebes', 'INTEGER NOT NULL DEFAULT 0');
+garantirColuna('cotacoes', 'preco_venda_unitario', 'REAL');
+garantirColuna('cotacoes', 'data_venda', 'TEXT');
+garantirColuna('cotacoes', 'origem_milhas', 'TEXT');
+garantirColuna('cotacoes', 'fornecedor_id', 'INTEGER');
+garantirColuna('cotacoes', 'bagagem_mao', 'INTEGER NOT NULL DEFAULT 0');
+garantirColuna('cotacoes', 'bagagem_despachada', 'INTEGER NOT NULL DEFAULT 0');
 
 garantirColuna('cotacao_opcoes', 'cia', 'TEXT');
 garantirColuna('cotacao_opcoes', 'classe', 'TEXT');
@@ -162,29 +239,129 @@ garantirColuna('cotacao_opcoes', 'hora_chegada', 'TEXT');
 garantirColuna('cotacao_opcoes', 'numero_voo', 'TEXT');
 garantirColuna('cotacao_opcoes', 'escolhida', 'INTEGER NOT NULL DEFAULT 0');
 
+/*
+ * Os check-ins ficavam em duas colunas fixas (ida e volta). Agora cada
+ * unidade tem a sua linha, então trazemos o que já estava marcado.
+ */
+const colunasViagem = colunasDe('viagens');
+
+if (colunasViagem.includes('checkin_ida')) {
+  const antigas = db.prepare('SELECT id, checkin_ida, checkin_ida_em, checkin_volta, checkin_volta_em FROM viagens').all();
+  const inserir = db.prepare(
+    'INSERT OR IGNORE INTO viagem_checkins (viagem_id, chave, feito, feito_em) VALUES (?, ?, ?, ?)'
+  );
+
+  // Conta só o que realmente entrou, para a migração não se repetir a cada partida
+  let migrados = 0;
+  for (const v of antigas) {
+    if (v.checkin_ida) migrados += inserir.run(v.id, 'ida-0', 1, v.checkin_ida_em).changes;
+    if (v.checkin_volta) migrados += inserir.run(v.id, 'volta-0', 1, v.checkin_volta_em).changes;
+  }
+
+  if (migrados) console.log(`[migração] ${migrados} check-in(s) movidos para a nova tabela`);
+}
+
+/*
+ * Antes havia só a quantidade total de passageiros. Agora ela é dividida em
+ * adultos, crianças e bebês, e o preço de venda é guardado por passageiro.
+ * Nas cotações antigas todos viram adultos e o unitário sai do total.
+ */
+const semFaixaEtaria = db
+  .prepare('SELECT COUNT(*) AS total FROM cotacoes WHERE adultos = 1 AND criancas = 0 AND bebes = 0 AND passageiros > 1')
+  .get().total;
+
+if (semFaixaEtaria > 0) {
+  db.exec('UPDATE cotacoes SET adultos = passageiros WHERE passageiros > 1 AND adultos = 1 AND criancas = 0 AND bebes = 0');
+  console.log(`[migração] ${semFaixaEtaria} cotação(ões) com passageiros passaram a contar como adultos`);
+}
+
+const semUnitario = db
+  .prepare('SELECT COUNT(*) AS total FROM cotacoes WHERE preco_venda IS NOT NULL AND preco_venda_unitario IS NULL')
+  .get().total;
+
+if (semUnitario > 0) {
+  db.exec(`
+    UPDATE cotacoes
+    SET preco_venda_unitario = ROUND(preco_venda / MAX(adultos + criancas, 1), 2)
+    WHERE preco_venda IS NOT NULL AND preco_venda_unitario IS NULL
+  `);
+  console.log(`[migração] preço por passageiro calculado em ${semUnitario} cotação(ões)`);
+}
+
+/*
+ * A mensagem do WhatsApp passou a ser genérica. Substitui o texto antigo
+ * de quem ainda não personalizou a sua.
+ */
+const msgGravada = db
+  .prepare("SELECT valor FROM configuracoes WHERE chave = 'mensagem_whatsapp'")
+  .get();
+
+if (msgGravada && msgGravada.valor.includes('Segue a cotação da sua viagem')) {
+  db.prepare("UPDATE configuracoes SET valor = ? WHERE chave = 'mensagem_whatsapp'")
+    .run('Olá {cliente}, tudo bem?');
+  console.log('[migração] mensagem do WhatsApp simplificada');
+}
+
+/*
+ * A taxa do cartão passou a ser guardada em fração decimal (0,096495).
+ * Bancos anteriores guardavam em percentual (9,6495), o que multiplicaria
+ * o valor por 10. Converte uma única vez quem estiver no formato antigo.
+ */
+const taxaGravada = db
+  .prepare("SELECT valor FROM configuracoes WHERE chave = 'taxa_cartao'")
+  .get();
+
+if (taxaGravada && Number(String(taxaGravada.valor).replace(',', '.')) >= 1) {
+  const convertida = Number(String(taxaGravada.valor).replace(',', '.')) / 100;
+  db.prepare("UPDATE configuracoes SET valor = ? WHERE chave = 'taxa_cartao'")
+    .run(String(convertida));
+  console.log('[migração] taxa do cartão convertida para fração decimal');
+}
+
 // Aeroportos da versão anterior guardavam a cidade como texto.
 // Aqui cada cidade vira registro próprio e o aeroporto passa a apontar para ela.
-const colunasAeroporto = colunasDe('aeroportos');
+if (colunasDe('aeroportos').includes('cidade')) {
+  // Passo 1: cada cidade que estava em texto vira registro próprio
+  if (!colunasDe('aeroportos').includes('cidade_id')) {
+    db.exec('ALTER TABLE aeroportos ADD COLUMN cidade_id INTEGER NOT NULL DEFAULT 0');
+  }
 
-if (colunasAeroporto.includes('cidade') && !colunasAeroporto.includes('cidade_id')) {
-  db.exec('ALTER TABLE aeroportos ADD COLUMN cidade_id INTEGER NOT NULL DEFAULT 0');
-
-  const antigos = db.prepare('SELECT id, sigla, cidade FROM aeroportos').all();
   const inserirCidade = db.prepare('INSERT OR IGNORE INTO cidades (nome) VALUES (?)');
   const buscarCidade = db.prepare('SELECT id FROM cidades WHERE nome = ?');
   const atualizar = db.prepare('UPDATE aeroportos SET cidade_id = ? WHERE id = ?');
 
-  for (const a of antigos) {
+  for (const a of db.prepare('SELECT id, cidade FROM aeroportos').all()) {
+    if (!a.cidade) continue;
     inserirCidade.run(a.cidade);
     atualizar.run(buscarCidade.get(a.cidade).id, a.id);
   }
 
-  console.log('[migração] aeroportos ligados à tabela de cidades');
+  /*
+   * Passo 2: a coluna antiga "cidade" continuava obrigatória, e como agora
+   * gravamos só o cidade_id, todo cadastro novo falhava com NOT NULL.
+   * O SQLite não remove coluna, então a tabela é recriada sem ela.
+   */
+  db.exec('PRAGMA foreign_keys = OFF');
+
+  db.exec(`
+    CREATE TABLE aeroportos_novo (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sigla TEXT NOT NULL UNIQUE,
+      cidade_id INTEGER NOT NULL
+    );
+  `);
+
+  db.exec(
+    'INSERT INTO aeroportos_novo (id, sigla, cidade_id) SELECT id, sigla, cidade_id FROM aeroportos WHERE cidade_id > 0'
+  );
+
+  db.exec('DROP TABLE aeroportos');
+  db.exec('ALTER TABLE aeroportos_novo RENAME TO aeroportos');
+  db.exec('PRAGMA foreign_keys = ON');
+
+  console.log('[migração] tabela de aeroportos recriada sem a coluna antiga de cidade');
 }
 
-garantirColuna('cotacoes', 'data_conclusao', 'TEXT');
-garantirColuna('cotacoes', 'bagagem_mao', 'INTEGER NOT NULL DEFAULT 0');
-garantirColuna('cotacoes', 'bagagem_despachada', 'INTEGER NOT NULL DEFAULT 0');
 
 garantirColuna('cotacao_opcoes', 'duracao_min', 'INTEGER');
 garantirColuna('cotacao_opcoes', 'aeronave', 'TEXT');
@@ -264,7 +441,8 @@ const PADROES = {
     'Realização do seu Check-in',
   ].join('\n'),
   cabecalho_imagem: CABECALHO_PADRAO,
-  taxa_cartao: '8.59',
+  mensagem_whatsapp: 'Olá {cliente}, tudo bem?',
+  taxa_cartao: '0.096495',
   parcelas_cartao: '4',
   rodape_aviso:
     'Isto é apenas uma cotação. Os preços estão sujeitos a alteração a qualquer momento pela companhia. Não fazemos pré-reserva sem aprovação.',

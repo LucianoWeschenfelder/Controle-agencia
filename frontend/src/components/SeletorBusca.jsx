@@ -7,6 +7,7 @@ import { useState, useRef, useEffect } from 'react';
  */
 export default function SeletorBusca({
   valor, opcoes, onSelecionar, placeholder = 'Buscar...', onCriar, textoCriar = 'Cadastrar',
+  permitirLimpar = false,
 }) {
   const [aberto, setAberto] = useState(false);
   const [busca, setBusca] = useState('');
@@ -65,6 +66,16 @@ export default function SeletorBusca({
           />
 
           <div className="seletor-busca-opcoes">
+            {permitirLimpar && valor !== '' && valor != null && (
+              <button
+                type="button"
+                className="seletor-busca-opcao limpar"
+                onClick={() => escolher({ valor: '' })}
+              >
+                Limpar seleção
+              </button>
+            )}
+
             {filtradas.map((opcao) => (
               <button
                 key={opcao.valor}
@@ -86,6 +97,8 @@ export default function SeletorBusca({
             <button
               type="button"
               className="seletor-busca-criar"
+              disabled={!busca.trim()}
+              title={busca.trim() ? '' : 'Digite o nome acima para cadastrar'}
               onClick={() => {
                 onCriar(busca.trim());
                 setAberto(false);
@@ -93,7 +106,7 @@ export default function SeletorBusca({
               }}
             >
               + {textoCriar}
-              {busca.trim() && ` "${busca.trim()}"`}
+              {busca.trim() ? ` "${busca.trim()}"` : ' (digite o nome acima)'}
             </button>
           )}
         </div>

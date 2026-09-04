@@ -8,6 +8,8 @@ import ciasRouter from './routes/cias.js';
 import aeroportosRouter from './routes/aeroportos.js';
 import cidadesRouter from './routes/cidades.js';
 import itensTarifaRouter from './routes/itens-tarifa.js';
+import viagensRouter from './routes/viagens.js';
+import fornecedoresRouter from './routes/fornecedores.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -22,6 +24,8 @@ app.use('/api/cias', ciasRouter);
 app.use('/api/aeroportos', aeroportosRouter);
 app.use('/api/cidades', cidadesRouter);
 app.use('/api/itens-tarifa', itensTarifaRouter);
+app.use('/api/viagens', viagensRouter);
+app.use('/api/fornecedores', fornecedoresRouter);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });

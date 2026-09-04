@@ -1,3 +1,5 @@
+import { abrirWhatsApp } from '../utils/whatsapp';
+
 export default function ClientesList({ clientes, carregando, onEditar, onExcluir }) {
   if (carregando) {
     return <p className="mensagem-vazia">Carregando clientes...</p>;
@@ -20,11 +22,19 @@ export default function ClientesList({ clientes, carregando, onEditar, onExcluir
             {cliente.email && <p><strong>E-mail:</strong> {cliente.email}</p>}
             {cliente.telefone && <p><strong>Telefone:</strong> {cliente.telefone}</p>}
             {cliente.data_nascimento && <p><strong>Nascimento:</strong> {cliente.data_nascimento}</p>}
-            {cliente.endereco && <p><strong>Endereço:</strong> {cliente.endereco}</p>}
             {cliente.observacoes && <p className="observacoes"><strong>Obs:</strong> {cliente.observacoes}</p>}
           </div>
 
           <div className="cliente-card-acoes">
+            {cliente.telefone && (
+              <button
+                className="btn btn-whatsapp"
+                onClick={() => abrirWhatsApp(cliente.telefone, '')}
+                title={`Falar com ${cliente.nome}`}
+              >
+                WhatsApp
+              </button>
+            )}
             <button className="btn btn-secundario" onClick={() => onEditar(cliente)}>
               Editar
             </button>

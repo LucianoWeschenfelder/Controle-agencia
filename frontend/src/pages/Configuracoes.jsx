@@ -7,9 +7,11 @@ const CAMPOS = [
   { chave: 'agencia_nome', rotulo: 'Nome da agência', tipo: 'texto' },
   { chave: 'agencia_slogan', rotulo: 'Slogan', tipo: 'texto' },
   { chave: 'agencia_contato', rotulo: 'Contato (telefone, WhatsApp, e-mail)', tipo: 'texto' },
-  { chave: 'taxa_cartao', rotulo: 'Taxa do cartão (%)', tipo: 'texto',
-    dica: 'Percentual somado ao preço à vista para chegar ao valor parcelado.' },
+  { chave: 'taxa_cartao', rotulo: 'Taxa do cartão', tipo: 'taxa',
+    dica: 'Em fração decimal, como aparece na maquininha (ex: 0,096495). Cada quantidade de parcelas tem a sua taxa, então informe a do número de parcelas abaixo.' },
   { chave: 'parcelas_cartao', rotulo: 'Número de parcelas no cartão', tipo: 'texto' },
+  { chave: 'mensagem_whatsapp', rotulo: 'Mensagem do WhatsApp', tipo: 'lista',
+    dica: 'Marcadores disponíveis: {cliente} {origem} {destino} {ida} {volta} {valor} {agencia}' },
   {
     chave: 'formas_pagamento',
     rotulo: 'Formas de pagamento',
@@ -72,6 +74,23 @@ export default function Configuracoes() {
     }
   }
 
+  // Mostra o efeito da taxa sobre um valor redondo, para conferência
+  function exemploTaxa() {
+    const taxa = Number(String(config.taxa_cartao ?? '').replace(',', '.'));
+    const parcelas = Number(config.parcelas_cartao) || 1;
+
+    if (!taxa || taxa <= 0) return 'Informe a taxa para ver o exemplo.';
+
+    const base = 4000;
+    const total = base * (1 + taxa);
+    const moeda = (v) =>
+      v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+    return `Equivale a ${(taxa * 100).toFixed(4).replace('.', ',')}%. ` +
+      `Uma venda de ${moeda(base)} fica em ${moeda(total)}, ` +
+      `em ${parcelas}x de ${moeda(total / parcelas)}.`;
+  }
+
   if (carregando) {
     return <p className="mensagem-vazia">Carregando ajustes...</p>;
   }
@@ -90,7 +109,16 @@ export default function Configuracoes() {
         {CAMPOS.map((campo) => (
           <label key={campo.chave} className="campo-config">
             {campo.rotulo}
-            {campo.tipo === 'imagem' ? (
+            {campo.tipo === 'taxa' ? (
+              <>
+                <input
+                  value={config[campo.chave] || ''}
+                  onChange={(e) => handleChange(campo.chave, e.target.value)}
+                  placeholder="0,096495"
+                />
+                <small className="previa-taxa">{exemploTaxa()}</small>
+              </>
+            ) : campo.tipo === 'imagem' ? (
               <div className="campo-imagem">
                 {config[campo.chave] && (
                   <img src={config[campo.chave]} alt="Arte do cabeçalho" />

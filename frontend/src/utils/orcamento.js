@@ -202,17 +202,24 @@ function blocoIncluido(cotacao) {
 }
 
 /*
- * Preço no cartão = preço à vista acrescido da taxa configurada.
- * O desconto do PIX é a diferença entre os dois, em percentual.
+ * Preço no cartão = preço à vista acrescido da taxa da maquininha.
+ * A taxa é informada em fração decimal (0,096495 = 9,6495%) e vale para
+ * o número de parcelas configurado, já que cada quantidade de parcelas
+ * tem a sua própria taxa.
+ *
+ * Ex.: venda 4.000 com taxa 0,096495 em 4x
+ *      total   = 4.000 x 1,096495 = 4.385,98
+ *      parcela = 4.385,98 / 4      = 1.096,50
  */
-function calcularPagamento(cotacao, config) {
+export function calcularPagamento(cotacao, config) {
   const aVista = cotacao.preco_venda;
   if (!aVista) return null;
 
-  const taxa = Number(config.taxa_cartao) || 0;
+  // Aceita tanto vírgula quanto ponto como separador decimal
+  const taxa = Number(String(config.taxa_cartao ?? '').replace(',', '.')) || 0;
   const parcelas = Number(config.parcelas_cartao) || 1;
 
-  const noCartao = aVista * (1 + taxa / 100);
+  const noCartao = aVista * (1 + taxa);
   const porParcela = noCartao / parcelas;
   const descontoPix = noCartao > 0 ? ((noCartao - aVista) / noCartao) * 100 : 0;
 
@@ -233,6 +240,22 @@ export function gerarHtmlOrcamento(cotacao, config, aeroportos = []) {
 
   const pagamento = calcularPagamento(cotacao, config);
   const passageiros = cotacao.passageiros || 1;
+  const pagantes = cotacao.pagantes || passageiros;
+
+  // Texto do tipo "02 Adultos, 01 Criança e 01 Bebê"
+  const composicao = [
+    [cotacao.adultos, 'Adulto', 'Adultos'],
+    [cotacao.criancas, 'Criança', 'Crianças'],
+    [cotacao.bebes, 'Bebê', 'Bebês'],
+  ]
+    .filter(([qtd]) => Number(qtd) > 0)
+    .map(([qtd, um, varios]) =>
+      `${String(qtd).padStart(2, '0')} ${Number(qtd) === 1 ? um : varios}`
+    );
+
+  const textoPassageiros = composicao.length
+    ? composicao.join(' · ')
+    : `${String(passageiros).padStart(2, '0')} Passageiro(s)`;
 
   return `
 <!DOCTYPE html>
@@ -242,9 +265,13 @@ export function gerarHtmlOrcamento(cotacao, config, aeroportos = []) {
 <title>Orçamento de viagem - ${cotacao.cliente?.nome || ''}</title>
 <style>
   ${FONTE_MONTSERRAT}
-  @page { size: A4; margin: 8mm; }
-  * { box-sizing: border-box; }
-  body { font-family: Arial, Helvetica, sans-serif; color: #1a2436; font-size: 11px; margin: 0; background: white; }
+  @page { size: A4; margin: 0; }
+
+  /* Sem isto o navegador imprime o PDF sem as cores de fundo,
+     e o texto branco sobre azul fica ilegível */
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #1a2436; font-size: 11px;
+    margin: 0; background: white; }
 
   /* Cabeçalho: arte à esquerda ocupando pouco mais da metade, dados à direita */
   .cabecalho { position: relative; display: flex; align-items: center; background: #f6ebdb;
@@ -266,7 +293,9 @@ export function gerarHtmlOrcamento(cotacao, config, aeroportos = []) {
 
   h2.secao { font-size: 13px; letter-spacing: 1px; color: #14243f; text-transform: uppercase; border-bottom: 2px solid #14243f; padding-bottom: 5px; margin: 0 0 12px; }
 
-  .sentido { border: 1px solid #e2e6ec; border-radius: 6px; margin-bottom: 14px; overflow: hidden; }
+  .sentido { border: 1px solid #e2e6ec; border-radius: 6px; margin-bottom: 14px; overflow: hidden;
+    break-inside: avoid; page-break-inside: avoid; }
+  .voo, .incluido, .pagamento, .rodape { break-inside: avoid; page-break-inside: avoid; }
   .sentido-topo { background: #f2ede1; padding: 8px 14px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e6ec; }
   .sentido-titulo { font-size: 11px; font-weight: bold; color: #14243f; letter-spacing: 0.3px; }
   .sentido-conexao { font-size: 11px; font-weight: bold; color: #8a6d2f; letter-spacing: 0.5px; }
@@ -335,8 +364,7 @@ export function gerarHtmlOrcamento(cotacao, config, aeroportos = []) {
   <strong>Resumo da viagem:</strong>
   ${nomeAeroporto(origemGeral, aeroportos)} → ${nomeAeroporto(destinoGeral, aeroportos)}
   <div class="resumo-linha2">
-    ${cotacao.tipo_viagem === 'ida' ? 'Somente Ida' : 'Ida e Volta'} |
-    ${String(passageiros).padStart(2, '0')} Passageiro(s)
+    ${cotacao.tipo_viagem === 'ida' ? 'Somente Ida' : 'Ida e Volta'} | ${textoPassageiros}
   </div>
 </div>
 
@@ -361,9 +389,9 @@ export function gerarHtmlOrcamento(cotacao, config, aeroportos = []) {
              <div class="pagamento-valor">${formatarMoeda(pagamento.aVista)}</div>
              ${
                pagamento.descontoPix > 0
-                 ? `<div class="pagamento-nota destaque">${pagamento.descontoPix.toFixed(
-                     0
-                   )}% OFF aplicado no PIX</div>`
+                 ? `<div class="pagamento-nota destaque">${pagamento.descontoPix
+                     .toFixed(1)
+                     .replace('.', ',')}% OFF aplicado no PIX</div>`
                  : ''
              }
            </div>
@@ -415,7 +443,26 @@ export function gerarPdf(cotacao, config, aeroportos) {
   janela.document.write(html);
   janela.document.close();
   janela.focus();
-  setTimeout(() => janela.print(), 400);
+
+  /*
+   * A arte e a fonte vão embutidas em base64 e levam um instante para
+   * ficarem prontas. Imprimir antes disso gera um PDF com texto quebrado,
+   * então esperamos o carregamento antes de abrir a impressão.
+   */
+  async function imprimirQuandoPronto() {
+    try {
+      if (janela.document.fonts?.ready) await janela.document.fonts.ready;
+    } catch {
+      // Se o navegador não expuser a API de fontes, seguimos mesmo assim
+    }
+    janela.print();
+  }
+
+  if (janela.document.readyState === 'complete') {
+    setTimeout(imprimirQuandoPronto, 150);
+  } else {
+    janela.addEventListener('load', () => setTimeout(imprimirQuandoPronto, 150));
+  }
 }
 
 export function gerarWord(cotacao, config, aeroportos) {

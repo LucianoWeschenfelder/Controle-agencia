@@ -18,10 +18,10 @@ const OPCOES = [
     icone: '💰',
   },
   {
-    id: 'ajustes',
-    titulo: 'Ajustes',
-    descricao: 'Textos que aparecem no orçamento enviado ao cliente.',
-    icone: '⚙️',
+    id: 'fornecedores',
+    titulo: 'Fornecedores',
+    descricao: 'Cadastrar quem fornece as milhas, com WhatsApp.',
+    icone: '🤝',
   },
   {
     id: 'viagens',

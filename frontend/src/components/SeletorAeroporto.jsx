@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import SeletorBusca from './SeletorBusca';
-import { criarAeroporto } from '../api/cadastros';
+import { criarAeroporto, criarCidade } from '../api/cadastros';
 
 export default function SeletorAeroporto({
   valor, aeroportos, cidades, onSelecionar, onNovoAeroporto, onNovaCidade,
@@ -8,8 +8,8 @@ export default function SeletorAeroporto({
   const [cadastrando, setCadastrando] = useState(false);
   const [sigla, setSigla] = useState('');
   const [cidadeId, setCidadeId] = useState('');
-  const [cidadeNova, setCidadeNova] = useState('');
   const [erro, setErro] = useState('');
+  const [salvando, setSalvando] = useState(false);
 
   const opcoes = aeroportos.map((a) => ({
     valor: a.sigla,
@@ -22,60 +22,73 @@ export default function SeletorAeroporto({
     opcoes.unshift({ valor, rotulo: valor });
   }
 
-  async function salvar() {
-    if (!sigla.trim()) return setErro('Informe a sigla.');
-    if (!cidadeId && !cidadeNova.trim()) return setErro('Escolha ou informe a cidade.');
+  /*
+   * Cria a cidade na hora e já a deixa selecionada, para não precisar
+   * de um segundo campo só para "cidade nova".
+   */
+  async function cadastrarCidade(nome) {
+    if (!nome?.trim()) {
+      setErro('Digite o nome da cidade antes de cadastrar.');
+      return;
+    }
 
     try {
-      const novo = await criarAeroporto(
-        cidadeId
-          ? { sigla, cidade_id: Number(cidadeId) }
-          : { sigla, cidade: cidadeNova }
-      );
-
-      onNovoAeroporto(novo);
-      if (!cidadeId && onNovaCidade) onNovaCidade({ id: novo.cidade_id, nome: novo.cidade });
-
-      onSelecionar(novo.sigla);
-      setCadastrando(false);
-      setSigla('');
-      setCidadeId('');
-      setCidadeNova('');
+      const nova = await criarCidade({ nome });
+      onNovaCidade?.(nova);
+      setCidadeId(nova.id);
       setErro('');
     } catch (err) {
       setErro(err.message);
     }
   }
 
+  async function salvar() {
+    if (!cidadeId) return setErro('Escolha ou cadastre a cidade.');
+    if (!sigla.trim()) return setErro('Informe a sigla do aeroporto.');
+
+    setSalvando(true);
+    setErro('');
+    try {
+      const novo = await criarAeroporto({ sigla, cidade_id: Number(cidadeId) });
+      onNovoAeroporto(novo);
+      onSelecionar(novo.sigla);
+      fechar();
+    } catch (err) {
+      setErro(err.message);
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  function fechar() {
+    setCadastrando(false);
+    setSigla('');
+    setCidadeId('');
+    setErro('');
+  }
+
   if (cadastrando) {
+    const cidadeEscolhida = cidades.find((c) => c.id === Number(cidadeId));
+
     return (
       <div className="cadastro-inline">
         <p className="cadastro-inline-titulo">Novo aeroporto</p>
 
-        <label>
-          Cidade já cadastrada
+        <div className="campo-seletor">
+          <span className="campo-seletor-rotulo">Cidade</span>
           <SeletorBusca
             valor={cidadeId}
             opcoes={cidades.map((c) => ({ valor: c.id, rotulo: c.nome }))}
-            onSelecionar={(v) => {
-              setCidadeId(v);
-              setCidadeNova('');
-            }}
-            placeholder="Buscar cidade..."
+            onSelecionar={setCidadeId}
+            placeholder="Buscar ou cadastrar cidade..."
+            onCriar={cadastrarCidade}
+            textoCriar="Cadastrar cidade"
+            permitirLimpar
           />
-        </label>
-
-        <label>
-          ou cidade nova
-          <input
-            placeholder="Nome da cidade"
-            value={cidadeNova}
-            onChange={(e) => {
-              setCidadeNova(e.target.value);
-              setCidadeId('');
-            }}
-          />
-        </label>
+          {cidadeEscolhida && (
+            <small className="cidade-ok">Cidade: {cidadeEscolhida.nome}</small>
+          )}
+        </div>
 
         <label>
           Sigla do aeroporto
@@ -88,10 +101,10 @@ export default function SeletorAeroporto({
         </label>
 
         <div className="cia-nova-acoes">
-          <button type="button" className="btn-mini" onClick={salvar}>
-            Salvar
+          <button type="button" className="btn-mini" onClick={salvar} disabled={salvando}>
+            {salvando ? 'Salvando...' : 'Salvar aeroporto'}
           </button>
-          <button type="button" className="btn-mini cancelar" onClick={() => setCadastrando(false)}>
+          <button type="button" className="btn-mini cancelar" onClick={fechar}>
             Cancelar
           </button>
         </div>
@@ -112,6 +125,7 @@ export default function SeletorAeroporto({
         setCadastrando(true);
       }}
       textoCriar="Cadastrar aeroporto"
+      permitirLimpar
     />
   );
 }

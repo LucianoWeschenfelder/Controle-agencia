@@ -5,7 +5,10 @@ import {
 } from '../api/cotacoes';
 import { buscarConfiguracoes } from '../api/configuracoes';
 import { listarAeroportos } from '../api/cadastros';
+import { listarFornecedores } from '../api/fornecedores';
+import OrigemMilhas from '../components/OrigemMilhas';
 import { gerarPdf, gerarWord } from '../utils/orcamento';
+import { abrirWhatsApp, montarMensagem } from '../utils/whatsapp';
 import { formatarMoeda, formatarData, formatarNumero } from '../utils/formato';
 
 const ABAS = [
@@ -24,6 +27,22 @@ const ACOES_STATUS = {
   vendida: [{ status: 'enviada', rotulo: 'Voltar para enviada' }],
   cancelada: [{ status: 'elaboracao', rotulo: 'Reabrir' }],
 };
+
+// Monta "2 adultos, 1 criança e 1 bebê" a partir das faixas etárias
+function composicaoPassageiros(c) {
+  const partes = [
+    [c.adultos, 'adulto', 'adultos'],
+    [c.criancas, 'criança', 'crianças'],
+    [c.bebes, 'bebê', 'bebês'],
+  ]
+    .filter(([qtd]) => Number(qtd) > 0)
+    .map(([qtd, um, varios]) => `${qtd} ${Number(qtd) === 1 ? um : varios}`);
+
+  if (!partes.length) return `${c.passageiros} passageiro(s)`;
+  if (partes.length === 1) return partes[0];
+
+  return `${partes.slice(0, -1).join(', ')} e ${partes.at(-1)}`;
+}
 
 function EtiquetaDias({ dias }) {
   if (dias === null || dias === undefined) return null;
@@ -75,7 +94,7 @@ function TabelaTrechos({ titulo, trechos }) {
   );
 }
 
-function CotacaoCard({ cotacao, config, aeroportos, onEditar, onStatus, onExcluir }) {
+function CotacaoCard({ cotacao, config, aeroportos, fornecedores, onAtualizar, onEditar, onStatus, onExcluir }) {
   const [expandida, setExpandida] = useState(false);
 
   const todosTrechos = [...cotacao.trechos_ida, ...cotacao.trechos_volta];
@@ -95,8 +114,7 @@ function CotacaoCard({ cotacao, config, aeroportos, onEditar, onStatus, onExclui
             {cotacao.tipo_viagem === 'ida' && <span className="selo-tipo">só ida</span>}
           </h3>
           <p className="cotacao-cliente">
-            {cotacao.cliente?.nome} · {cotacao.passageiros}{' '}
-            {cotacao.passageiros === 1 ? 'passageiro' : 'passageiros'}
+            {cotacao.cliente?.nome} · {composicaoPassageiros(cotacao)}
           </p>
         </div>
 
@@ -135,7 +153,18 @@ function CotacaoCard({ cotacao, config, aeroportos, onEditar, onStatus, onExclui
       )}
 
       {cotacao.data_envio && (
-        <p className="cotacao-envio">Enviada em {formatarData(cotacao.data_envio)}</p>
+        <p className="cotacao-envio">
+          Enviada em {formatarData(cotacao.data_envio)}
+          {cotacao.data_venda && ` · vendida em ${formatarData(cotacao.data_venda)}`}
+        </p>
+      )}
+
+      {cotacao.status === 'vendida' && (
+        <OrigemMilhas
+          cotacao={cotacao}
+          fornecedores={fornecedores}
+          onAtualizar={onAtualizar}
+        />
       )}
 
       <button className="btn-link" onClick={() => setExpandida(!expandida)}>
@@ -173,6 +202,23 @@ function CotacaoCard({ cotacao, config, aeroportos, onEditar, onStatus, onExclui
           Gerar Word
         </button>
 
+        <button
+          className="btn btn-whatsapp"
+          onClick={() =>
+            abrirWhatsApp(
+              cotacao.cliente?.telefone,
+              montarMensagem(config.mensagem_whatsapp, cotacao, config)
+            )
+          }
+          title={
+            cotacao.cliente?.telefone
+              ? `Falar com ${cotacao.cliente.nome}`
+              : 'Cliente sem telefone cadastrado — o WhatsApp vai pedir o contato'
+          }
+        >
+          WhatsApp
+        </button>
+
         {(ACOES_STATUS[cotacao.status] || []).map((acao) => (
           <button
             key={acao.status}
@@ -195,6 +241,7 @@ export default function Cotacoes() {
   const [cotacoes, setCotacoes] = useState([]);
   const [config, setConfig] = useState({});
   const [aeroportos, setAeroportos] = useState([]);
+  const [fornecedores, setFornecedores] = useState([]);
   const [contagens, setContagens] = useState({});
   const [aba, setAba] = useState('elaboracao');
   const [busca, setBusca] = useState('');
@@ -206,6 +253,7 @@ export default function Cotacoes() {
   useEffect(() => {
     buscarConfiguracoes().then(setConfig).catch(() => {});
     listarAeroportos().then(setAeroportos).catch(() => {});
+    listarFornecedores().then(setFornecedores).catch(() => {});
   }, []);
 
   const carregar = useCallback(async () => {
@@ -333,6 +381,8 @@ export default function Cotacoes() {
               cotacao={cotacao}
               config={config}
               aeroportos={aeroportos}
+              fornecedores={fornecedores}
+              onAtualizar={carregar}
               onEditar={(c) => {
                 setCotacaoEditando(c);
                 setModo('form');

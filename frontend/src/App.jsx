@@ -4,6 +4,8 @@ import CadastrarCliente from './pages/CadastrarCliente';
 import ConsultarClientes from './pages/ConsultarClientes';
 import Cotacoes from './pages/Cotacoes';
 import Configuracoes from './pages/Configuracoes';
+import Viagens from './pages/Viagens';
+import Fornecedores from './pages/Fornecedores';
 import EmConstrucao from './pages/EmConstrucao';
 import './App.css';
 
@@ -13,6 +15,7 @@ const TITULOS = {
   'consultar-clientes': 'Consultar cadastros',
   cotacoes: 'Cotações',
   ajustes: 'Ajustes',
+  fornecedores: 'Fornecedores',
   viagens: 'Administrar viagens',
 };
 
@@ -33,13 +36,11 @@ export default function App() {
       case 'ajustes':
         return <Configuracoes />;
 
+      case 'fornecedores':
+        return <Fornecedores />;
+
       case 'viagens':
-        return (
-          <EmConstrucao
-            titulo="Administrar viagens"
-            descricao="Aqui serão acompanhadas as viagens confirmadas, datas e check."
-          />
-        );
+        return <Viagens />;
 
       default:
         return <Home onNavegar={setTela} />;
@@ -55,11 +56,21 @@ export default function App() {
             <p className="subtitulo">{TITULOS[tela]}</p>
           </div>
 
-          {tela !== 'home' && (
-            <button className="btn btn-voltar" onClick={() => setTela('home')}>
-              ← Voltar ao início
+          <div className="app-header-acoes">
+            {tela !== 'home' && (
+              <button className="btn btn-voltar" onClick={() => setTela('home')}>
+                ← Voltar ao início
+              </button>
+            )}
+
+            <button
+              className={`btn btn-voltar ${tela === 'ajustes' ? 'ativo' : ''}`}
+              onClick={() => setTela(tela === 'ajustes' ? 'home' : 'ajustes')}
+              title="Ajustes do orçamento"
+            >
+              ⚙️ Ajustes
             </button>
-          )}
+          </div>
         </div>
       </header>
 

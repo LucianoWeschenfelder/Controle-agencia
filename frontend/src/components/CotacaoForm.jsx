@@ -20,8 +20,8 @@ const TRECHO_VAZIO = { origem: '', destino: '', data: '', opcoes: [{ ...OPCAO_VA
 
 const COTACAO_VAZIA = {
   cliente_id: '', origem: '', destino: '', tipo_viagem: 'ida_volta',
-  data_ida: '', data_volta: '', passageiros: 1,
-  valor_internet: '', preco_venda: '', observacoes: '',
+  data_ida: '', data_volta: '', adultos: 1, criancas: 0, bebes: 0,
+  valor_internet: '', preco_venda_unitario: '', observacoes: '',
 };
 
 // Converte os trechos vindos da API para o formato dos campos do formulário
@@ -59,7 +59,7 @@ export default function CotacaoForm({ cotacaoEditando, onSalvar, onCancelar }) {
           ...cotacaoEditando,
           data_volta: cotacaoEditando.data_volta || '',
           valor_internet: cotacaoEditando.valor_internet ?? '',
-          preco_venda: cotacaoEditando.preco_venda ?? '',
+          preco_venda_unitario: cotacaoEditando.preco_venda_unitario ?? '',
           observacoes: cotacaoEditando.observacoes || '',
         }
       : COTACAO_VAZIA
@@ -239,11 +239,21 @@ export default function CotacaoForm({ cotacaoEditando, onSalvar, onCancelar }) {
     trechosIda.some((t) => t.opcoes.some((o) => o.escolhida)) ||
     (idaEVolta && trechosVolta.some((t) => t.opcoes.some((o) => o.escolhida)));
 
-  const passageiros = Number(dados.passageiros) || 1;
-  const custoUnitario = subtotalIda + subtotalVolta;
-  const custoTotal = temEscolha ? custoUnitario * passageiros : null;
+  const adultos = Number(dados.adultos) || 0;
+  const criancas = Number(dados.criancas) || 0;
+  const bebes = Number(dados.bebes) || 0;
 
-  const precoVenda = dados.preco_venda === '' ? null : Number(dados.preco_venda);
+  const totalPassageiros = adultos + criancas + bebes;
+  // Bebê viaja no colo: não gera passagem e não entra na multiplicação
+  const pagantes = Math.max(adultos + criancas, 1);
+
+  const custoUnitario = subtotalIda + subtotalVolta;
+  const custoTotal = temEscolha ? custoUnitario * pagantes : null;
+
+  const vendaUnitaria =
+    dados.preco_venda_unitario === '' ? null : Number(dados.preco_venda_unitario);
+  const precoVenda = vendaUnitaria !== null ? vendaUnitaria * pagantes : null;
+
   const lucro = custoTotal !== null && precoVenda !== null ? precoVenda - custoTotal : null;
 
   const valorInternet = dados.valor_internet === '' ? null : Number(dados.valor_internet);
@@ -316,6 +326,9 @@ export default function CotacaoForm({ cotacaoEditando, onSalvar, onCancelar }) {
       ...dados,
       ...(cotacaoEditando || {}),
       ...dados,
+      passageiros: totalPassageiros,
+      pagantes,
+      preco_venda: precoVenda,
       cliente,
       referencia: cotacaoEditando?.referencia || 'PRÉVIA',
       data_conclusao: cotacaoEditando?.data_conclusao || new Date().toISOString().slice(0, 10),
@@ -377,8 +390,8 @@ export default function CotacaoForm({ cotacaoEditando, onSalvar, onCancelar }) {
         />
 
         <div className="form-grid">
-          <label>
-            Origem *
+          <div className="campo-seletor">
+            <span className="campo-seletor-rotulo">Origem *</span>
             <SeletorAeroporto
               valor={dados.origem}
               aeroportos={aeroportos}
@@ -387,16 +400,18 @@ export default function CotacaoForm({ cotacaoEditando, onSalvar, onCancelar }) {
               cidades={cidades}
               onNovaCidade={adicionarCidadeNaLista}
             />
-          </label>
-          <label>
-            Destino *
+          </div>
+          <div className="campo-seletor">
+            <span className="campo-seletor-rotulo">Destino *</span>
             <SeletorAeroporto
               valor={dados.destino}
               aeroportos={aeroportos}
               onSelecionar={(v) => setDados((p) => ({ ...p, destino: v }))}
               onNovoAeroporto={adicionarAeroportoNaLista}
+              cidades={cidades}
+              onNovaCidade={adicionarCidadeNaLista}
             />
-          </label>
+          </div>
           <label>
             Tipo de viagem
             <select name="tipo_viagem" value={dados.tipo_viagem} onChange={handleChange}>
@@ -405,14 +420,19 @@ export default function CotacaoForm({ cotacaoEditando, onSalvar, onCancelar }) {
             </select>
           </label>
           <label>
-            Passageiros
-            <input
-              type="number"
-              min="1"
-              name="passageiros"
-              value={dados.passageiros}
-              onChange={handleChange}
-            />
+            Adultos (acima de 16 anos)
+            <input type="number" min="0" name="adultos" value={dados.adultos} onChange={handleChange} />
+          </label>
+
+          <label>
+            Crianças (até 16 anos)
+            <input type="number" min="0" name="criancas" value={dados.criancas} onChange={handleChange} />
+          </label>
+
+          <label>
+            Bebês (até 2 anos)
+            <input type="number" min="0" name="bebes" value={dados.bebes} onChange={handleChange} />
+            <small>Bebê no colo não paga passagem</small>
           </label>
           <label>
             Data da ida *
@@ -503,16 +523,27 @@ export default function CotacaoForm({ cotacaoEditando, onSalvar, onCancelar }) {
             />
           </label>
           <label>
-            Preço de venda (total)
+            Preço de venda por passageiro
             <input
               type="number"
               step="0.01"
-              name="preco_venda"
-              value={dados.preco_venda}
+              name="preco_venda_unitario"
+              value={dados.preco_venda_unitario}
               onChange={handleChange}
             />
+            <small>
+              {pagantes > 1
+                ? `Multiplicado por ${pagantes} pagantes`
+                : 'Valor cobrado de cada passageiro pagante'}
+            </small>
           </label>
         </div>
+
+        <p className="dica">
+          {totalPassageiros} passageiro{totalPassageiros === 1 ? '' : 's'} no total
+          {bebes > 0 && `, sendo ${bebes} bebê${bebes === 1 ? '' : 's'} que não paga${bebes === 1 ? '' : 'm'} passagem`}
+          .
+        </p>
 
         <div className="resumo-financeiro">
           <div className="resumo-item">
@@ -520,12 +551,12 @@ export default function CotacaoForm({ cotacaoEditando, onSalvar, onCancelar }) {
             <strong>{temEscolha ? formatarMoeda(custoUnitario) : '—'}</strong>
           </div>
           <div className="resumo-item">
-            <span>Custo total ({passageiros}x)</span>
+            <span>Custo total ({pagantes}x)</span>
             <strong>{custoTotal !== null ? formatarMoeda(custoTotal) : '—'}</strong>
           </div>
           <div className="resumo-item">
-            <span>Preço de venda</span>
-            <strong>{formatarMoeda(dados.preco_venda)}</strong>
+            <span>Venda total ({pagantes}x)</span>
+            <strong>{precoVenda !== null ? formatarMoeda(precoVenda) : '—'}</strong>
           </div>
           <div className={`resumo-item ${lucro !== null && lucro < 0 ? 'negativo' : 'positivo'}`}>
             <span>Lucro</span>

@@ -174,8 +174,8 @@ function CabecalhoTrecho({ trecho, indice, editando, onAlterar, onEditar, onRemo
     return (
       <div className="trecho-topo editando">
         <div className="trecho-campos">
-          <label>
-            Origem
+          <div className="campo-seletor">
+            <span className="campo-seletor-rotulo">Origem</span>
             <SeletorAeroporto
               valor={trecho.origem}
               aeroportos={aeroportos}
@@ -184,9 +184,9 @@ function CabecalhoTrecho({ trecho, indice, editando, onAlterar, onEditar, onRemo
               cidades={cidades}
               onNovaCidade={onNovaCidade}
             />
-          </label>
-          <label>
-            Destino
+          </div>
+          <div className="campo-seletor">
+            <span className="campo-seletor-rotulo">Destino</span>
             <SeletorAeroporto
               valor={trecho.destino}
               aeroportos={aeroportos}
@@ -195,7 +195,7 @@ function CabecalhoTrecho({ trecho, indice, editando, onAlterar, onEditar, onRemo
               cidades={cidades}
               onNovaCidade={onNovaCidade}
             />
-          </label>
+          </div>
           <label>
             Data
             <input

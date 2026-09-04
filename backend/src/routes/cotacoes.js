@@ -78,10 +78,12 @@ function montarCotacao(cotacao) {
   const custoVolta = custoDoSentido(trechosVolta);
 
   const temEscolha = custoIda !== null || custoVolta !== null;
-  const passageiros = cotacao.passageiros || 1;
+
+  // Bebê viaja no colo e não gera passagem, então não entra na multiplicação
+  const pagantes = Math.max(contarPagantes(cotacao.adultos, cotacao.criancas), 1);
 
   const custoUnitario = (custoIda ?? 0) + (custoVolta ?? 0);
-  const custoTotal = temEscolha ? Number((custoUnitario * passageiros).toFixed(2)) : null;
+  const custoTotal = temEscolha ? Number((custoUnitario * pagantes).toFixed(2)) : null;
 
   const lucro =
     custoTotal !== null && cotacao.preco_venda !== null
@@ -101,15 +103,21 @@ function montarCotacao(cotacao) {
     dias_desde_envio = Math.floor((new Date() - envio) / (1000 * 60 * 60 * 24));
   }
 
+  const fornecedor = cotacao.fornecedor_id
+    ? db.prepare('SELECT * FROM fornecedores WHERE id = ?').get(cotacao.fornecedor_id)
+    : null;
+
   return {
     ...cotacao,
     referencia: referenciaDe(cotacao),
     cliente,
+    fornecedor,
     itens,
     trechos_ida: trechosIda,
     trechos_volta: trechosVolta,
     custo_ida: custoIda,
     custo_volta: custoVolta,
+    pagantes,
     custo_unitario: temEscolha ? Number(custoUnitario.toFixed(2)) : null,
     custo: custoTotal,
     lucro,
@@ -185,7 +193,25 @@ function regravarTudo(cotacaoId, body) {
   salvarItens(cotacaoId, body.itens);
 }
 
+/*
+ * Bebês não multiplicam o valor: só adultos e crianças contam como pagantes.
+ */
+export function contarPagantes(adultos, criancas) {
+  return Math.max(Number(adultos) || 0, 0) + Math.max(Number(criancas) || 0, 0);
+}
+
 function extrairDados(body) {
+  const adultos = Number(body.adultos) > 0 ? Number(body.adultos) : 1;
+  const criancas = Number(body.criancas) > 0 ? Number(body.criancas) : 0;
+  const bebes = Number(body.bebes) > 0 ? Number(body.bebes) : 0;
+
+  const pagantes = contarPagantes(adultos, criancas);
+
+  const unitario =
+    body.preco_venda_unitario !== '' && body.preco_venda_unitario != null
+      ? Number(body.preco_venda_unitario)
+      : null;
+
   return {
     cliente_id: body.cliente_id,
     origem: (body.origem || '').trim().toUpperCase(),
@@ -193,13 +219,14 @@ function extrairDados(body) {
     tipo_viagem: body.tipo_viagem === 'ida' ? 'ida' : 'ida_volta',
     data_ida: body.data_ida,
     data_volta: body.data_volta || null,
-    passageiros: Number(body.passageiros) > 0 ? Number(body.passageiros) : 1,
+    adultos, criancas, bebes,
+    passageiros: adultos + criancas + bebes,
     valor_internet:
       body.valor_internet !== '' && body.valor_internet != null
         ? Number(body.valor_internet) : null,
-    preco_venda:
-      body.preco_venda !== '' && body.preco_venda != null
-        ? Number(body.preco_venda) : null,
+    preco_venda_unitario: unitario,
+    // O total cobrado é o valor por passageiro vezes os pagantes (bebê não paga)
+    preco_venda: unitario !== null ? Number((unitario * Math.max(pagantes, 1)).toFixed(2)) : null,
     observacoes: body.observacoes || null,
     bagagem_mao: Number(body.bagagem_mao) || 0,
     bagagem_despachada: Number(body.bagagem_despachada) || 0,
@@ -266,14 +293,16 @@ router.post('/', (req, res) => {
     .prepare(
       `INSERT INTO cotacoes
         (cliente_id, origem, destino, tipo_viagem, data_ida, data_volta, passageiros,
-         valor_internet, preco_venda, observacoes, bagagem_mao, bagagem_despachada, data_conclusao)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         adultos, criancas, bebes, valor_internet, preco_venda, preco_venda_unitario,
+         observacoes, bagagem_mao, bagagem_despachada, data_conclusao)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       dados.cliente_id, dados.origem, dados.destino, dados.tipo_viagem,
       dados.data_ida, dados.data_volta, dados.passageiros,
-      dados.valor_internet, dados.preco_venda, dados.observacoes,
-      dados.bagagem_mao, dados.bagagem_despachada,
+      dados.adultos, dados.criancas, dados.bebes,
+      dados.valor_internet, dados.preco_venda, dados.preco_venda_unitario,
+      dados.observacoes, dados.bagagem_mao, dados.bagagem_despachada,
       // A data de conclusão só é gravada quando a cotação é salva completa
       req.body.rascunho ? null : hoje()
     );
@@ -297,14 +326,16 @@ router.put('/:id', (req, res) => {
   db.prepare(
     `UPDATE cotacoes SET
       cliente_id = ?, origem = ?, destino = ?, tipo_viagem = ?, data_ida = ?, data_volta = ?,
-      passageiros = ?, valor_internet = ?, preco_venda = ?, observacoes = ?,
+      passageiros = ?, adultos = ?, criancas = ?, bebes = ?,
+      valor_internet = ?, preco_venda = ?, preco_venda_unitario = ?, observacoes = ?,
       bagagem_mao = ?, bagagem_despachada = ?, data_conclusao = ?
      WHERE id = ?`
   ).run(
     dados.cliente_id, dados.origem, dados.destino, dados.tipo_viagem,
     dados.data_ida, dados.data_volta, dados.passageiros,
-    dados.valor_internet, dados.preco_venda, dados.observacoes,
-    dados.bagagem_mao, dados.bagagem_despachada,
+    dados.adultos, dados.criancas, dados.bebes,
+    dados.valor_internet, dados.preco_venda, dados.preco_venda_unitario,
+    dados.observacoes, dados.bagagem_mao, dados.bagagem_despachada,
     // Mantém a data de conclusão original; grava agora se for a primeira vez
     req.body.rascunho ? existente.data_conclusao : existente.data_conclusao || hoje(),
     req.params.id
@@ -327,16 +358,45 @@ router.patch('/:id/status', (req, res) => {
   if (!cotacao) return res.status(404).json({ erro: 'Cotação não encontrada' });
 
   const dataEnvio =
-    status === 'enviada' && !cotacao.data_envio
-      ? new Date().toISOString().slice(0, 10)
-      : cotacao.data_envio;
+    status === 'enviada' && !cotacao.data_envio ? hoje() : cotacao.data_envio;
 
-  db.prepare('UPDATE cotacoes SET status = ?, data_envio = ? WHERE id = ?')
-    .run(status, dataEnvio, req.params.id);
+  // A data da venda é gravada na primeira vez que a cotação vira vendida
+  const dataVenda =
+    status === 'vendida' && !cotacao.data_venda ? hoje() : cotacao.data_venda;
+
+  db.prepare('UPDATE cotacoes SET status = ?, data_envio = ?, data_venda = ? WHERE id = ?')
+    .run(status, dataEnvio, dataVenda, req.params.id);
 
   res.json(
     montarCotacao(db.prepare('SELECT * FROM cotacoes WHERE id = ?').get(req.params.id))
   );
+});
+
+/*
+ * Define de onde saíram as milhas: de um fornecedor cadastrado ou das
+ * milhas próprias. Só faz sentido depois da cotação ser vendida.
+ */
+router.patch('/:id/fornecedor', (req, res) => {
+  const { origem_milhas, fornecedor_id } = req.body;
+
+  const cotacao = db.prepare('SELECT * FROM cotacoes WHERE id = ?').get(req.params.id);
+  if (!cotacao) return res.status(404).json({ erro: 'Cotação não encontrada' });
+
+  if (origem_milhas && !['proprio', 'fornecedor'].includes(origem_milhas)) {
+    return res.status(400).json({ erro: 'Origem das milhas inválida' });
+  }
+
+  if (origem_milhas === 'fornecedor' && !fornecedor_id) {
+    return res.status(400).json({ erro: 'Escolha o fornecedor' });
+  }
+
+  db.prepare('UPDATE cotacoes SET origem_milhas = ?, fornecedor_id = ? WHERE id = ?').run(
+    origem_milhas || null,
+    origem_milhas === 'fornecedor' ? fornecedor_id : null,
+    req.params.id
+  );
+
+  res.json(montarCotacao(db.prepare('SELECT * FROM cotacoes WHERE id = ?').get(req.params.id)));
 });
 
 router.delete('/:id', (req, res) => {

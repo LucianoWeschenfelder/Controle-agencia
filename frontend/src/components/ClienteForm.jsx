@@ -6,7 +6,6 @@ const CAMPOS_VAZIOS = {
   email: '',
   telefone: '',
   data_nascimento: '',
-  endereco: '',
   observacoes: '',
 };
 
@@ -82,11 +81,6 @@ export default function ClienteForm({ clienteEditando, onSalvar, onCancelar }) {
         <label>
           Data de nascimento
           <input type="date" name="data_nascimento" value={dados.data_nascimento || ''} onChange={handleChange} />
-        </label>
-
-        <label className="campo-largo">
-          Endereço
-          <input name="endereco" value={dados.endereco} onChange={handleChange} />
         </label>
 
         <label className="campo-largo">
