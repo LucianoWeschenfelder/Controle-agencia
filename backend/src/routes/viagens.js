@@ -185,8 +185,10 @@ function calcularEtapa(unidade, unidades, viagem, feito) {
   return 'aguardando_checkin';
 }
 
-function salvarAcompanhantes(viagemId, lista = []) {
+function salvarAcompanhantes(viagemId, lista = [], cotacaoId = null) {
   db.prepare('DELETE FROM viagem_passageiros WHERE viagem_id = ?').run(viagemId);
+
+  const dataViagem = cotacaoId ? dataDaViagem(cotacaoId) : null;
 
   const inserir = db.prepare(
     `INSERT INTO viagem_passageiros (viagem_id, ordem, nome, documento, data_nascimento, tipo)
@@ -196,13 +198,50 @@ function salvarAcompanhantes(viagemId, lista = []) {
   (lista || []).forEach((p, i) => {
     if (!p.nome?.trim()) return;
 
-    const tipo = ['adulto', 'crianca', 'bebe'].includes(p.tipo) ? p.tipo : 'adulto';
+    // A faixa etária é sempre calculada, nunca escolhida à mão
+    const tipo = classificarPassageiro(p.data_nascimento, dataViagem) || 'adulto';
 
     inserir.run(
       viagemId, i, p.nome.trim(),
       p.documento?.trim() || null, p.data_nascimento || null, tipo
     );
   });
+}
+
+/*
+ * Faixa etária pela data de nascimento, considerando a idade que a pessoa
+ * terá no dia do voo. Bebê viaja no colo até completar 2 anos; criança vai
+ * até os 16; acima disso é adulto.
+ */
+export function classificarPassageiro(dataNascimento, dataViagem) {
+  if (!dataNascimento || !dataViagem) return null;
+
+  const nascimento = new Date(`${dataNascimento.slice(0, 10)}T12:00:00`);
+  const viagem = new Date(`${dataViagem.slice(0, 10)}T12:00:00`);
+
+  if (Number.isNaN(nascimento.getTime()) || Number.isNaN(viagem.getTime())) return null;
+
+  let idade = viagem.getFullYear() - nascimento.getFullYear();
+
+  // Desconta um ano se ainda não fez aniversário até a data do voo
+  const mes = viagem.getMonth() - nascimento.getMonth();
+  if (mes < 0 || (mes === 0 && viagem.getDate() < nascimento.getDate())) idade--;
+
+  if (idade < 0) return null;
+  if (idade < 2) return 'bebe';
+  if (idade <= 16) return 'crianca';
+  return 'adulto';
+}
+
+// Data do primeiro voo da viagem, base para calcular a idade
+function dataDaViagem(cotacaoId) {
+  const trecho = db
+    .prepare(
+      "SELECT data FROM cotacao_trechos WHERE cotacao_id = ? AND sentido = 'ida' ORDER BY ordem ASC LIMIT 1"
+    )
+    .get(cotacaoId);
+
+  return trecho?.data || null;
 }
 
 // Um localizador por unidade de check-in
@@ -380,6 +419,7 @@ router.get('/:id', (req, res) => {
     adultos: cotacao?.adultos ?? 1,
     criancas: cotacao?.criancas ?? 0,
     bebes: cotacao?.bebes ?? 0,
+    data_viagem: dataDaViagem(viagem.cotacao_id),
     acompanhantes: acompanhantesDe(viagem.id),
   });
 });
@@ -409,7 +449,7 @@ router.post('/', (req, res) => {
     .run(cotacao_id, horas, localizador?.trim() || null, observacoes?.trim() || null);
 
   const viagemId = Number(r.lastInsertRowid);
-  salvarAcompanhantes(viagemId, req.body.acompanhantes);
+  salvarAcompanhantes(viagemId, req.body.acompanhantes, cotacao_id);
   salvarLocalizadores(viagemId, req.body.localizadores);
 
   res.status(201).json(
@@ -433,7 +473,7 @@ router.put('/:id', (req, res) => {
   );
 
   if (req.body.acompanhantes) {
-    salvarAcompanhantes(Number(req.params.id), req.body.acompanhantes);
+    salvarAcompanhantes(Number(req.params.id), req.body.acompanhantes, viagem.cotacao_id);
   }
 
   if (req.body.localizadores) {

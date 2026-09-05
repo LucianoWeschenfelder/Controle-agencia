@@ -2,6 +2,20 @@ import { useState, useEffect } from 'react';
 import SeletorBusca from './SeletorBusca';
 import { listarCotacoesDisponiveis } from '../api/viagens';
 import { formatarData } from '../utils/formato';
+import { classificarPassageiro, rotuloTipo, idadeNaViagem } from '../utils/passageiro';
+
+// Mostra a faixa calculada, para conferir na hora de digitar
+export function FaixaEtaria({ nascimento, dataViagem }) {
+  const tipo = classificarPassageiro(nascimento, dataViagem);
+  const idade = idadeNaViagem(nascimento, dataViagem);
+
+  return (
+    <span className={`selo-tipo-passageiro ${tipo || 'pendente'}`}>
+      {rotuloTipo(tipo)}
+      {idade !== null && ` · ${idade} ano${idade === 1 ? '' : 's'}`}
+    </span>
+  );
+}
 
 export default function ViagemForm({ onSalvar, onCancelar }) {
   const [disponiveis, setDisponiveis] = useState([]);
@@ -22,6 +36,7 @@ export default function ViagemForm({ onSalvar, onCancelar }) {
   }, []);
 
   const escolhida = disponiveis.find((c) => c.id === Number(cotacaoId));
+  const dataViagem = escolhida?.unidades?.[0]?.data || null;
 
   /*
    * O titular é o cliente da cotação, então a quantidade de acompanhantes
@@ -33,18 +48,11 @@ export default function ViagemForm({ onSalvar, onCancelar }) {
     const cotacao = disponiveis.find((c) => c.id === Number(id));
     if (!cotacao) return;
 
-    /*
-     * O titular conta como um adulto. Os acompanhantes já nascem com o tipo
-     * certo, seguindo a quantidade informada na cotação.
-     */
-    const tipos = [
-      ...Array(Math.max((cotacao.adultos || 1) - 1, 0)).fill('adulto'),
-      ...Array(cotacao.criancas || 0).fill('crianca'),
-      ...Array(cotacao.bebes || 0).fill('bebe'),
-    ];
+    // O titular já conta como um passageiro; o resto são os acompanhantes
+    const quantos = Math.max((cotacao.passageiros || 1) - 1, 0);
 
     setAcompanhantes(
-      tipos.map((tipo) => ({ nome: '', documento: '', data_nascimento: '', tipo }))
+      Array.from({ length: quantos }, () => ({ nome: '', documento: '', data_nascimento: '' }))
     );
 
     // Voo separado tem reserva própria, então cada unidade tem seu localizador
@@ -216,17 +224,13 @@ export default function ViagemForm({ onSalvar, onCancelar }) {
                     Acompanhantes ({acompanhantes.length}) — o titular é{' '}
                     {escolhida?.cliente?.nome}
                   </p>
+                  <p className="dica">
+                    A faixa etária sai da data de nascimento, pela idade no dia do voo
+                    {dataViagem && ` (${formatarData(dataViagem)})`}.
+                  </p>
 
                   {acompanhantes.map((a, i) => (
                     <div className="acompanhante-linha" key={i}>
-                      <select
-                        value={a.tipo}
-                        onChange={(e) => alterarAcompanhante(i, 'tipo', e.target.value)}
-                      >
-                        <option value="adulto">Adulto</option>
-                        <option value="crianca">Criança</option>
-                        <option value="bebe">Bebê</option>
-                      </select>
                       <input
                         placeholder={`Nome completo do passageiro ${i + 2}`}
                         value={a.nome}
@@ -239,9 +243,11 @@ export default function ViagemForm({ onSalvar, onCancelar }) {
                       />
                       <input
                         type="date"
+                        title="Data de nascimento"
                         value={a.data_nascimento}
                         onChange={(e) => alterarAcompanhante(i, 'data_nascimento', e.target.value)}
                       />
+                      <FaixaEtaria nascimento={a.data_nascimento} dataViagem={dataViagem} />
                     </div>
                   ))}
                 </div>

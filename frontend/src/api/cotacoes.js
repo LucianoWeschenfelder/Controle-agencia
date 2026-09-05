@@ -71,3 +71,7 @@ export async function alterarDatas(id, dados) {
     })
   );
 }
+
+export async function buscarCotacao(id) {
+  return tratarResposta(await fetch(`${BASE_URL}/${id}`));
+}

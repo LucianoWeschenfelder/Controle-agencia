@@ -84,13 +84,36 @@ function montarCotacao(cotacao) {
 
   const itens = db
     .prepare(
-      `SELECT ci.item_id, ci.quantidade, i.titulo, i.descricao, i.tem_quantidade
+      `SELECT ci.item_id, ci.quantidade, ci.por_passageiro,
+              i.titulo, i.descricao, i.tem_quantidade, i.fixo, i.icone
        FROM cotacao_itens ci
        JOIN itens_tarifa i ON i.id = ci.item_id
        WHERE ci.cotacao_id = ?
-       ORDER BY i.id ASC`
+       ORDER BY i.fixo DESC, i.id ASC`
     )
-    .all(cotacao.id);
+    .all(cotacao.id)
+    .map((i) => ({ ...i, por_passageiro: Boolean(i.por_passageiro), fixo: Boolean(i.fixo) }));
+
+  /*
+   * Itens fixos entram sempre, mesmo que a cotação não os tenha escolhido:
+   * passagem e item pessoal acompanham qualquer tarifa.
+   */
+  const fixos = db
+    .prepare('SELECT * FROM itens_tarifa WHERE fixo = 1 ORDER BY id ASC')
+    .all()
+    .filter((f) => !itens.some((i) => i.item_id === f.id))
+    .map((f) => ({
+      item_id: f.id,
+      quantidade: 1,
+      por_passageiro: false,
+      titulo: f.titulo,
+      descricao: f.descricao,
+      tem_quantidade: false,
+      fixo: true,
+      icone: f.icone,
+    }));
+
+  const itensCompletos = [...fixos, ...itens];
 
   const pagantesDaCotacao = Math.max(contarPagantes(cotacao.adultos, cotacao.criancas), 1);
 
@@ -135,7 +158,7 @@ function montarCotacao(cotacao) {
     referencia: referenciaDe(cotacao),
     cliente,
     fornecedor,
-    itens,
+    itens: itensCompletos,
     trechos_ida: trechosIda,
     trechos_volta: trechosVolta,
     custo_ida: custoIda,
@@ -219,12 +242,19 @@ function salvarItens(cotacaoId, itens = []) {
   db.prepare('DELETE FROM cotacao_itens WHERE cotacao_id = ?').run(cotacaoId);
 
   const inserir = db.prepare(
-    'INSERT INTO cotacao_itens (cotacao_id, item_id, quantidade) VALUES (?, ?, ?)'
+    `INSERT INTO cotacao_itens (cotacao_id, item_id, quantidade, por_passageiro)
+     VALUES (?, ?, ?, ?)`
   );
 
   for (const item of itens) {
     if (!item.item_id) continue;
-    inserir.run(cotacaoId, item.item_id, Number(item.quantidade) || 1);
+
+    inserir.run(
+      cotacaoId,
+      item.item_id,
+      Number(item.quantidade) || 1,
+      item.por_passageiro ? 1 : 0
+    );
   }
 }
 

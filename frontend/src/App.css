@@ -2407,3 +2407,96 @@ body {
   border-left: 3px solid var(--cinza-borda);
   padding-left: 12px;
 }
+
+/* Links que se comportam como blocos clicáveis */
+.app-marca {
+  text-decoration: none;
+  color: inherit;
+}
+
+.menu-card {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* O botão de Ajustes virou link e precisa alinhar como botão */
+a.btn {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+/* Itens da tarifa */
+.itens-fixos {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.item-fixo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--cinza-borda);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--creme);
+}
+
+.item-fixo div {
+  flex: 1;
+}
+
+.item-fixo strong {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--azul-oceano-escuro);
+}
+
+.item-fixo small {
+  font-size: 0.78rem;
+  color: var(--cinza-texto);
+}
+
+.selo-fixo {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 2px 9px;
+  border-radius: 10px;
+  background: var(--coral);
+  color: var(--azul-oceano-escuro);
+}
+
+.item-icone {
+  line-height: 0;
+  flex-shrink: 0;
+}
+
+.item-escolhido-nome {
+  flex: 1;
+}
+
+.item-escolhido-acoes select {
+  padding: 6px 8px;
+  border: 1px solid var(--cinza-borda);
+  border-radius: 6px;
+  font-size: 0.82rem;
+  background: white;
+}
+
+.selo-tipo-passageiro.pendente {
+  background: #fff4e0;
+  color: #a86400;
+  font-style: italic;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.acompanhante-linha .selo-tipo-passageiro {
+  align-self: center;
+  margin-right: 0;
+  white-space: nowrap;
+}

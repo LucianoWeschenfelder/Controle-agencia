@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Routes, Route, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import ViagemForm from '../components/ViagemForm';
 import ViagemEditar from '../components/ViagemEditar';
 import EditarBloco from '../components/EditarBloco';
@@ -265,15 +266,54 @@ function LinhaCheckin({ linha, config, onCheckin, onSalvarBloco, onEditar, onExc
   );
 }
 
-export default function Viagens() {
+function CadastroViagem() {
+  const navigate = useNavigate();
+
+  async function salvar(dados) {
+    await criarViagem(dados);
+    navigate('/viagens');
+  }
+
+  return (
+    <div className="pagina">
+      <ViagemForm onSalvar={salvar} onCancelar={() => navigate('/viagens')} />
+    </div>
+  );
+}
+
+function EdicaoViagem() {
+  const navigate = useNavigate();
+  const { id } = useParams();
+
+  async function salvar(viagemId, dados) {
+    await editarViagem(viagemId, dados);
+    navigate('/viagens');
+  }
+
+  return (
+    <div className="pagina">
+      <ViagemEditar
+        viagemId={Number(id)}
+        onSalvar={salvar}
+        onCancelar={() => navigate('/viagens')}
+      />
+    </div>
+  );
+}
+
+function ListaViagens() {
   const [linhas, setLinhas] = useState([]);
   const [config, setConfig] = useState({});
-  const [etapa, setEtapa] = useState('realizar_checkin');
+  const navigate = useNavigate();
+  const [parametros, setParametros] = useSearchParams();
+
+  // A etapa fica na URL, sem criar entrada nova no histórico a cada clique
+  const etapa = parametros.get('etapa') || 'realizar_checkin';
+  const setEtapa = (valor) => setParametros({ etapa: valor }, { replace: true });
   const [busca, setBusca] = useState('');
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
-  const [modo, setModo] = useState('lista');
-  const [viagemEditando, setViagemEditando] = useState(null);
+
 
   useEffect(() => {
     buscarConfiguracoes().then(setConfig).catch(() => {});
@@ -295,12 +335,6 @@ export default function Viagens() {
     const timeout = setTimeout(carregar, 300);
     return () => clearTimeout(timeout);
   }, [carregar]);
-
-  async function salvar(dados) {
-    await criarViagem(dados);
-    setModo('lista');
-    carregar();
-  }
 
   async function alterarCheckin(linha, feito) {
     try {
@@ -340,36 +374,6 @@ export default function Viagens() {
     }
   }
 
-  async function salvarEdicao(id, dados) {
-    await editarViagem(id, dados);
-    setModo('lista');
-    setViagemEditando(null);
-    carregar();
-  }
-
-  if (modo === 'form') {
-    return (
-      <div className="pagina">
-        <ViagemForm onSalvar={salvar} onCancelar={() => setModo('lista')} />
-      </div>
-    );
-  }
-
-  if (modo === 'editar') {
-    return (
-      <div className="pagina">
-        <ViagemEditar
-          viagemId={viagemEditando}
-          onSalvar={salvarEdicao}
-          onCancelar={() => {
-            setModo('lista');
-            setViagemEditando(null);
-          }}
-        />
-      </div>
-    );
-  }
-
   const contagens = {};
   for (const item of ETAPAS) {
     contagens[item.id] = linhas.filter((l) => l.etapa === item.id).length;
@@ -387,7 +391,7 @@ export default function Viagens() {
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
         />
-        <button className="btn btn-primario" onClick={() => setModo('form')}>
+        <button className="btn btn-primario" onClick={() => navigate('/viagens/nova')}>
           + Cadastrar viagem
         </button>
       </div>
@@ -420,15 +424,22 @@ export default function Viagens() {
               config={config}
               onCheckin={alterarCheckin}
               onSalvarBloco={salvarBlocoCompleto}
-              onEditar={(l) => {
-                setViagemEditando(l.viagem_id);
-                setModo('editar');
-              }}
+              onEditar={(l) => navigate(`/viagens/${l.viagem_id}/editar`)}
               onExcluir={handleExcluir}
             />
           ))}
         </div>
       )}
     </div>
+  );
+}
+
+export default function Viagens() {
+  return (
+    <Routes>
+      <Route path="/" element={<ListaViagens />} />
+      <Route path="nova" element={<CadastroViagem />} />
+      <Route path=":id/editar" element={<EdicaoViagem />} />
+    </Routes>
   );
 }

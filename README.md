@@ -3,11 +3,16 @@
 Projeto de portfólio para acompanhamento de uma agência de viagens (clientes, cotações, check-in etc).
 Primeira etapa: cadastro e listagem de clientes.
 
+## Navegação e segurança
+Cada tela tem seu endereço (`/cotacoes`, `/viagens/3/editar`, e assim por diante), então o botão de voltar do navegador funciona e atualizar a página (F5) não perde o lugar. A aba selecionada vai na URL como `?situacao=` ou `?etapa=`, sem encher o histórico.
+
+O backend escuta apenas em `127.0.0.1`, ou seja, só aceita conexão da própria máquina. Ninguém na mesma rede consegue abrir a API e ler os dados dos clientes. Para acessar de outro aparelho seria preciso remover essa restrição — e, nesse caso, colocar login antes.
+
 ## Identidade visual
 O sistema usa a paleta da marca: navy, dourado e creme, com títulos em serifa. O selo fica no cabeçalho (`frontend/public/selo.jpg`) e serve também como ícone da aba. Nome e slogan da agência são editáveis em Ajustes.
 
 ## Stack
-- Frontend: React (Vite) + CSS puro
+- Frontend: React (Vite) + React Router + CSS puro
 - Backend: Node.js + Express
 - Banco de dados: SQLite (better-sqlite3)
 
@@ -76,7 +81,7 @@ A lista é por unidade de check-in, não por viagem. Cada card é um check-in a 
 
 - Cadastro parte de uma cotação vendida. Cliente, telefone, e-mail, rota, datas e horários vêm dela automaticamente, e a tela mostra quais check-ins serão criados
 - Preenchimento manual: quantas horas antes do voo o check-in libera (24 ou 48), um localizador por reserva (voos separados têm reservas diferentes) e observações
-- Com mais de um passageiro, o cadastro já pede os acompanhantes na quantidade certa e com o tipo pré-selecionado (adulto, criança ou bebê), seguindo o que foi informado na cotação
+- Com mais de um passageiro, o cadastro pede os acompanhantes na quantidade certa. A faixa etária não é escolhida: sai da data de nascimento, pela idade que a pessoa terá no dia do voo — bebê até completar 2 anos, criança até os 16, adulto acima disso. A etiqueta aparece enquanto se digita
 - A etapa não é gravada: o sistema calcula pela data do voo, pela antecedência escolhida e pelo check-in marcado, então cada card anda sozinho com o tempo
 - Cada card mostra em destaque o nome completo do passageiro titular, mais companhia, localizador e horário de saída — os dados pedidos no check-in
 - Quando a cotação tem mais de um passageiro, o cadastro pede os acompanhantes (nome, documento e nascimento). No card, um botão mostra a lista deles

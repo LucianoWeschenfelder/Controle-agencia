@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { buscarViagem } from '../api/viagens';
+import { FaixaEtaria } from './ViagemForm';
+import { formatarData } from '../utils/formato';
 
 export default function ViagemEditar({ viagemId, onSalvar, onCancelar }) {
   const [dados, setDados] = useState(null);
@@ -21,7 +23,6 @@ export default function ViagemEditar({ viagemId, onSalvar, onCancelar }) {
             nome: existentes[i]?.nome || '',
             documento: existentes[i]?.documento || '',
             data_nascimento: existentes[i]?.data_nascimento || '',
-            tipo: existentes[i]?.tipo || 'adulto',
           }))
         );
       })
@@ -111,19 +112,13 @@ export default function ViagemEditar({ viagemId, onSalvar, onCancelar }) {
           <h3>Acompanhantes ({acompanhantes.length})</h3>
           <p className="dica">
             A cotação prevê {dados.adultos} adulto(s), {dados.criancas} criança(s) e{' '}
-            {dados.bebes} bebê(s), contando o titular.
+            {dados.bebes} bebê(s), contando o titular. A faixa de cada acompanhante sai
+            da data de nascimento, pela idade no dia do voo
+            {dados.data_viagem && ` (${formatarData(dados.data_viagem)})`}.
           </p>
 
           {acompanhantes.map((a, i) => (
             <div className="acompanhante-linha" key={i}>
-              <select
-                value={a.tipo}
-                onChange={(e) => alterarAcompanhante(i, 'tipo', e.target.value)}
-              >
-                <option value="adulto">Adulto</option>
-                <option value="crianca">Criança</option>
-                <option value="bebe">Bebê</option>
-              </select>
               <input
                 placeholder={`Nome completo do passageiro ${i + 2}`}
                 value={a.nome}
@@ -136,9 +131,11 @@ export default function ViagemEditar({ viagemId, onSalvar, onCancelar }) {
               />
               <input
                 type="date"
+                title="Data de nascimento"
                 value={a.data_nascimento}
                 onChange={(e) => alterarAcompanhante(i, 'data_nascimento', e.target.value)}
               />
+              <FaixaEtaria nascimento={a.data_nascimento} dataViagem={dados.data_viagem} />
             </div>
           ))}
         </section>

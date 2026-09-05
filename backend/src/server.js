@@ -39,6 +39,11 @@ app.use((err, req, res, next) => {
   res.status(500).json({ erro: err.message || 'Erro interno no servidor' });
 });
 
-app.listen(PORT, () => {
+/*
+ * Escuta só em 127.0.0.1: o servidor aceita conexão apenas da própria
+ * máquina. Sem isso ele responderia a qualquer um na mesma rede, que
+ * poderia ler os dados dos clientes sem senha nenhuma.
+ */
+app.listen(PORT, '127.0.0.1', () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);
 });

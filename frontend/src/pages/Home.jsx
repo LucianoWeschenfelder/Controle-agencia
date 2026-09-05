@@ -1,37 +1,39 @@
+import { Link } from 'react-router-dom';
+
 const OPCOES = [
   {
-    id: 'cadastrar-cliente',
+    id: '/clientes/novo',
     titulo: 'Cadastrar clientes',
     descricao: 'Incluir um novo cliente na base da agência.',
     icone: '👤',
   },
   {
-    id: 'consultar-clientes',
+    id: '/clientes',
     titulo: 'Consultar cadastros',
     descricao: 'Buscar, editar e excluir clientes já cadastrados.',
     icone: '🔍',
   },
   {
-    id: 'cotacoes',
+    id: '/cotacoes',
     titulo: 'Cotações',
     descricao: 'Montar e acompanhar orçamentos de viagem.',
     icone: '💰',
   },
   {
-    id: 'fornecedores',
+    id: '/fornecedores',
     titulo: 'Fornecedores',
     descricao: 'Cadastrar quem fornece as milhas, com WhatsApp.',
     icone: '🤝',
   },
   {
-    id: 'viagens',
+    id: '/viagens',
     titulo: 'Administrar viagens',
     descricao: 'Acompanhar viagens confirmadas, datas e check.',
     icone: '✈️',
   },
 ];
 
-export default function Home({ onNavegar }) {
+export default function Home() {
   return (
     <div className="home">
       <div className="home-intro">
@@ -41,15 +43,11 @@ export default function Home({ onNavegar }) {
 
       <div className="menu-grid">
         {OPCOES.map((opcao) => (
-          <button
-            key={opcao.id}
-            className="menu-card"
-            onClick={() => onNavegar(opcao.id)}
-          >
+          <Link key={opcao.id} className="menu-card" to={opcao.id}>
             <span className="menu-card-icone">{opcao.icone}</span>
             <span className="menu-card-titulo">{opcao.titulo}</span>
             <span className="menu-card-descricao">{opcao.descricao}</span>
-          </button>
+          </Link>
         ))}
       </div>
     </div>

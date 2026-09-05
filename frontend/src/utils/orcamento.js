@@ -1,5 +1,6 @@
 import { formatarMoeda } from './formato';
 import { FONTE_MONTSERRAT } from './fonte-montserrat';
+import { iconeSvg } from './icones';
 import { minutosEntre, formatarDuracao, chegaNoDiaSeguinte, somarDias } from './tempo';
 
 const MESES = [
@@ -204,12 +205,27 @@ function blocoSentido(sentido, rotulo, aeroportos) {
 }
 
 // Itens fixos da tarifa mais as bagagens escolhidas na cotação
-// Itens marcados como incluídos na própria cotação
+/*
+ * Itens incluídos na tarifa. A quantidade pode ser por passageiro
+ * ("1 por passageiro") ou um número fechado ("2x").
+ */
 function blocoIncluido(cotacao) {
-  const itens = (cotacao.itens || []).map((i) => ({
-    titulo: i.tem_quantidade && i.quantidade > 1 ? `${i.quantidade}x ${i.titulo}` : i.titulo,
-    descricao: i.descricao || '',
-  }));
+  const itens = (cotacao.itens || []).map((i) => {
+    let titulo = i.titulo;
+    let complemento = i.descricao || '';
+
+    if (i.tem_quantidade) {
+      if (i.por_passageiro) {
+        titulo = i.quantidade > 1 ? `${i.quantidade}x ${i.titulo}` : i.titulo;
+        complemento = [complemento, 'por passageiro'].filter(Boolean).join(' · ');
+      } else {
+        titulo = `${i.quantidade}x ${i.titulo}`;
+        complemento = [complemento, 'no total'].filter(Boolean).join(' · ');
+      }
+    }
+
+    return { titulo, descricao: complemento, icone: i.icone };
+  });
 
   if (!itens.length) return '';
 
@@ -217,6 +233,7 @@ function blocoIncluido(cotacao) {
     .map(
       (i) => `
       <div class="incluido-item">
+        <div class="incluido-icone">${iconeSvg(i.icone, '#b08d3d', 28)}</div>
         <div class="incluido-titulo">${i.titulo}</div>
         <div class="incluido-descricao">${i.descricao}</div>
       </div>`
@@ -343,7 +360,9 @@ export function gerarHtmlOrcamento(cotacao, config, aeroportos = []) {
   .sentido-total { border-top: 1px dashed #dfe4ea; text-align: right; padding: 7px 14px; font-size: 10px; font-style: italic; color: #6b7688; }
 
   .incluido { display: flex; gap: 10px; border: 1px solid #e2e6ec; border-radius: 6px; padding: 12px; margin-bottom: 14px; }
-  .incluido-item { flex: 1; text-align: center; }
+  .incluido-item { flex: 1; text-align: center; padding: 0 6px; }
+  .incluido-icone { margin-bottom: 4px; line-height: 0; }
+  .incluido-item + .incluido-item { border-left: 1px solid #e8e2d5; }
   .incluido-titulo { font-size: 11px; font-weight: bold; color: #14243f; }
   .incluido-descricao { font-size: 9px; color: #6b7688; margin-top: 2px; }
 

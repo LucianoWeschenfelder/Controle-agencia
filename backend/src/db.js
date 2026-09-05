@@ -132,7 +132,9 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     titulo TEXT NOT NULL UNIQUE,
     descricao TEXT,
-    tem_quantidade INTEGER NOT NULL DEFAULT 0
+    tem_quantidade INTEGER NOT NULL DEFAULT 0,
+    fixo INTEGER NOT NULL DEFAULT 0,
+    icone TEXT
   );
 `);
 
@@ -158,7 +160,8 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     cotacao_id INTEGER NOT NULL,
     item_id INTEGER NOT NULL,
-    quantidade INTEGER NOT NULL DEFAULT 1
+    quantidade INTEGER NOT NULL DEFAULT 1,
+    por_passageiro INTEGER NOT NULL DEFAULT 1
   );
 `);
 
@@ -286,6 +289,13 @@ garantirColuna('viagem_checkins', 'antecedencia', 'INTEGER');
 // Endereço do check-in de cada companhia, para abrir direto pelo sistema
 garantirColuna('cias', 'url_checkin', 'TEXT');
 
+// Itens que sempre acompanham a tarifa e o ícone de cada um
+garantirColuna('itens_tarifa', 'fixo', 'INTEGER NOT NULL DEFAULT 0');
+garantirColuna('itens_tarifa', 'icone', 'TEXT');
+
+// A quantidade pode ser por passageiro ou um número fechado
+garantirColuna('cotacao_itens', 'por_passageiro', 'INTEGER NOT NULL DEFAULT 1');
+
 // Cada acompanhante precisa dizer se é adulto, criança ou bebê
 garantirColuna('viagem_passageiros', 'tipo', "TEXT NOT NULL DEFAULT 'adulto'");
 
@@ -317,6 +327,36 @@ if (colunasViagem.includes('checkin_ida')) {
   }
 
   if (migrados) console.log(`[migração] ${migrados} check-in(s) movidos para a nova tabela`);
+}
+
+/*
+ * Os itens de tarifa ganharam ícone e marcação de fixo. Aqui os que já
+ * existiam recebem esses valores, sem mexer nos que o usuário criou.
+ */
+const PADRAO_ITENS = {
+  'Passagens Aéreas & Taxas': { fixo: 1, icone: 'aviao' },
+  'Item Pessoal': { fixo: 1, icone: 'mochila' },
+  'Remarcação': { fixo: 0, icone: 'troca' },
+  'Bagagem de mão': { fixo: 0, icone: 'bagagem-mao' },
+  'Bagagem despachada': { fixo: 0, icone: 'bagagem-despachada' },
+  'Marcação de assento': { fixo: 0, icone: 'assento' },
+  'Cancelamento': { fixo: 0, icone: 'cancelamento' },
+};
+
+const semIcone = db
+  .prepare('SELECT COUNT(*) AS total FROM itens_tarifa WHERE icone IS NULL')
+  .get().total;
+
+if (semIcone > 0) {
+  const ajustar = db.prepare(
+    'UPDATE itens_tarifa SET fixo = ?, icone = ? WHERE titulo = ? AND icone IS NULL'
+  );
+
+  for (const [titulo, { fixo, icone }] of Object.entries(PADRAO_ITENS)) {
+    ajustar.run(fixo, icone, titulo);
+  }
+
+  console.log('[migração] ícones e itens fixos definidos na tarifa');
 }
 
 /*
@@ -585,18 +625,24 @@ const totalItens = db.prepare('SELECT COUNT(*) AS total FROM itens_tarifa').get(
 
 if (totalItens === 0) {
   const inserirItem = db.prepare(
-    'INSERT OR IGNORE INTO itens_tarifa (titulo, descricao, tem_quantidade) VALUES (?, ?, ?)'
+    `INSERT OR IGNORE INTO itens_tarifa (titulo, descricao, tem_quantidade, fixo, icone)
+     VALUES (?, ?, ?, ?, ?)`
   );
+
+  // fixo = 1 significa que o item sempre aparece no orçamento
   const itens = [
-    ['Item Pessoal', 'Bolsa / Mochila pequena', 0],
-    ['Passagens Aéreas & Taxas', 'Tarifas de embarque incluídas', 0],
-    ['Remarcação', 'Com taxa + diferença de preço', 0],
-    ['Bagagem de mão', 'Até 10 kg por passageiro', 1],
-    ['Bagagem despachada', 'Até 23 kg por passageiro', 1],
-    ['Marcação de assento', 'Assento padrão incluído', 0],
-    ['Cancelamento', 'Com retenção de taxa', 0],
+    ['Passagens Aéreas & Taxas', 'Tarifas de embarque incluídas', 0, 1, 'aviao'],
+    ['Item Pessoal', 'Bolsa / Mochila pequena', 0, 1, 'mochila'],
+    ['Remarcação', 'Com taxa + diferença de preço', 0, 0, 'troca'],
+    ['Bagagem de mão', 'Até 10 kg', 1, 0, 'bagagem-mao'],
+    ['Bagagem despachada', 'Até 23 kg', 1, 0, 'bagagem-despachada'],
+    ['Marcação de assento', 'Assento padrão incluído', 0, 0, 'assento'],
+    ['Cancelamento', 'Com retenção de taxa', 0, 0, 'cancelamento'],
   ];
-  for (const [titulo, descricao, temQtd] of itens) inserirItem.run(titulo, descricao, temQtd);
+
+  for (const [titulo, descricao, temQtd, fixo, icone] of itens) {
+    inserirItem.run(titulo, descricao, temQtd, fixo, icone);
+  }
 }
 
 // Textos que aparecem no orçamento enviado ao cliente

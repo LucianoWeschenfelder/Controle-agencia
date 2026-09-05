@@ -3,6 +3,7 @@ import SeletorCliente from './SeletorCliente';
 import BlocoSentido, { calcularCusto } from './BlocoSentido';
 import SeletorAeroporto from './SeletorAeroporto';
 import { formatarMoeda } from '../utils/formato';
+import { iconeSvg } from '../utils/icones';
 import { listarCias } from '../api/cias';
 import { listarAeroportos, listarCidades, listarItensTarifa } from '../api/cadastros';
 import { listarClasses, criarClasse } from '../api/classes';
@@ -94,10 +95,14 @@ export default function CotacaoForm({ cotacaoEditando, onSalvar, onCancelar }) {
   const [aba, setAba] = useState('cotacao');
 
   const [itens, setItens] = useState(() =>
-    (cotacaoEditando?.itens || []).map((i) => ({
-      item_id: i.item_id,
-      quantidade: i.quantidade,
-    }))
+    (cotacaoEditando?.itens || [])
+      // Os fixos entram sozinhos no orçamento, não precisam ser guardados
+      .filter((i) => !i.fixo)
+      .map((i) => ({
+        item_id: i.item_id,
+        quantidade: i.quantidade,
+        por_passageiro: i.por_passageiro ?? true,
+      }))
   );
   const [nomeCliente, setNomeCliente] = useState(cotacaoEditando?.cliente?.nome || '');
   const [erro, setErro] = useState('');
@@ -423,13 +428,11 @@ export default function CotacaoForm({ cotacaoEditando, onSalvar, onCancelar }) {
   // --- Itens incluídos na tarifa ---
   function adicionarItem(itemId) {
     if (!itemId || itens.some((i) => i.item_id === itemId)) return;
-    setItens((prev) => [...prev, { item_id: itemId, quantidade: 1 }]);
+    setItens((prev) => [...prev, { item_id: itemId, quantidade: 1, por_passageiro: true }]);
   }
 
-  function alterarQuantidade(itemId, quantidade) {
-    setItens((prev) =>
-      prev.map((i) => (i.item_id === itemId ? { ...i, quantidade } : i))
-    );
+  function alterarItem(itemId, campo, valor) {
+    setItens((prev) => prev.map((i) => (i.item_id === itemId ? { ...i, [campo]: valor } : i)));
   }
 
   function removerItem(itemId) {
@@ -462,12 +465,18 @@ export default function CotacaoForm({ cotacaoEditando, onSalvar, onCancelar }) {
       data_conclusao: cotacaoEditando?.data_conclusao || new Date().toISOString().slice(0, 10),
       trechos_ida: paraApi(trechosIda),
       trechos_volta: idaEVolta ? paraApi(trechosVolta) : [],
-      itens: itens
-        .map((i) => {
-          const doCatalogo = catalogoItens.find((c) => c.id === i.item_id);
-          return doCatalogo ? { ...doCatalogo, ...i } : null;
-        })
-        .filter(Boolean),
+      // Fixos primeiro, como o backend faz, para a prévia bater com o PDF
+      itens: [
+        ...catalogoItens
+          .filter((c) => c.fixo)
+          .map((c) => ({ ...c, item_id: c.id, quantidade: 1, por_passageiro: false })),
+        ...itens
+          .map((i) => {
+            const doCatalogo = catalogoItens.find((c) => c.id === i.item_id);
+            return doCatalogo ? { ...doCatalogo, ...i } : null;
+          })
+          .filter(Boolean),
+      ],
     };
   }
 
@@ -729,12 +738,32 @@ export default function CotacaoForm({ cotacaoEditando, onSalvar, onCancelar }) {
 
         <section className="bloco">
           <h3>Incluído na tarifa</h3>
-          <p className="dica">Escolha o que acompanha a passagem nesta cotação.</p>
+
+          {/* Itens fixos aparecem em toda cotação e não podem ser retirados */}
+          <div className="itens-fixos">
+            {catalogoItens
+              .filter((c) => c.fixo)
+              .map((c) => (
+                <div className="item-fixo" key={c.id}>
+                  <span
+                    className="item-icone"
+                    dangerouslySetInnerHTML={{ __html: iconeSvg(c.icone, '#b08d3d', 22) }}
+                  />
+                  <div>
+                    <strong>{c.titulo}</strong>
+                    {c.descricao && <small>{c.descricao}</small>}
+                  </div>
+                  <span className="selo-fixo">sempre incluso</span>
+                </div>
+              ))}
+          </div>
+
+          <p className="dica">Adicione o que mais acompanha esta passagem.</p>
 
           <SeletorBusca
             valor=""
             opcoes={catalogoItens
-              .filter((c) => !itens.some((i) => i.item_id === c.id))
+              .filter((c) => !c.fixo && !itens.some((i) => i.item_id === c.id))
               .map((c) => ({ valor: c.id, rotulo: c.titulo, sub: c.descricao }))}
             onSelecionar={adicionarItem}
             placeholder="Adicionar item incluído..."
@@ -747,21 +776,44 @@ export default function CotacaoForm({ cotacaoEditando, onSalvar, onCancelar }) {
 
               return (
                 <div className="item-escolhido" key={i.item_id}>
-                  <div>
+                  <span
+                    className="item-icone"
+                    dangerouslySetInnerHTML={{ __html: iconeSvg(doCatalogo.icone, '#b08d3d', 22) }}
+                  />
+
+                  <div className="item-escolhido-nome">
                     <strong>{doCatalogo.titulo}</strong>
                     {doCatalogo.descricao && <small>{doCatalogo.descricao}</small>}
                   </div>
 
                   <div className="item-escolhido-acoes">
                     {Boolean(doCatalogo.tem_quantidade) && (
-                      <input
-                        type="number"
-                        min="1"
-                        value={i.quantidade}
-                        onChange={(e) => alterarQuantidade(i.item_id, Number(e.target.value))}
-                      />
+                      <>
+                        <input
+                          type="number"
+                          min="1"
+                          value={i.quantidade}
+                          onChange={(e) =>
+                            alterarItem(i.item_id, 'quantidade', Number(e.target.value))
+                          }
+                        />
+                        <select
+                          value={i.por_passageiro ? 'passageiro' : 'total'}
+                          onChange={(e) =>
+                            alterarItem(i.item_id, 'por_passageiro', e.target.value === 'passageiro')
+                          }
+                        >
+                          <option value="passageiro">por passageiro</option>
+                          <option value="total">no total</option>
+                        </select>
+                      </>
                     )}
-                    <button type="button" className="btn-remover" onClick={() => removerItem(i.item_id)}>
+
+                    <button
+                      type="button"
+                      className="btn-remover"
+                      onClick={() => removerItem(i.item_id)}
+                    >
                       ✕
                     </button>
                   </div>
@@ -770,7 +822,7 @@ export default function CotacaoForm({ cotacaoEditando, onSalvar, onCancelar }) {
             })}
 
             {itens.length === 0 && (
-              <p className="mensagem-vazia">Nenhum item incluído ainda.</p>
+              <p className="mensagem-vazia">Nenhum item extra nesta cotação.</p>
             )}
           </div>
         </section>

@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Routes, Route, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import CotacaoForm from '../components/CotacaoForm';
 import {
   listarCotacoes, criarCotacao, editarCotacao, alterarStatus, excluirCotacao, alterarDatas,
+  buscarCotacao,
 } from '../api/cotacoes';
 import { buscarConfiguracoes } from '../api/configuracoes';
 import { listarAeroportos } from '../api/cadastros';
@@ -279,18 +281,64 @@ function CotacaoCard({ cotacao, config, aeroportos, fornecedores, onAtualizar, o
   );
 }
 
-export default function Cotacoes() {
+/*
+ * Cada situação da cotação fica no endereço, então a tela sobrevive ao F5
+ * e o botão de voltar do navegador funciona entre lista e formulário.
+ */
+function FormularioCotacao({ novo }) {
+  const navigate = useNavigate();
+  const { id } = useParams();
+
+  const [cotacao, setCotacao] = useState(null);
+  const [carregando, setCarregando] = useState(!novo);
+  const [erro, setErro] = useState('');
+
+  useEffect(() => {
+    if (novo) return;
+
+    buscarCotacao(id)
+      .then(setCotacao)
+      .catch(() => setErro('Não foi possível carregar a cotação.'))
+      .finally(() => setCarregando(false));
+  }, [id, novo]);
+
+  async function salvar(dados) {
+    if (novo) await criarCotacao(dados);
+    else await editarCotacao(id, dados);
+
+    navigate('/cotacoes');
+  }
+
+  if (carregando) return <p className="mensagem-vazia">Carregando cotação...</p>;
+  if (erro) return <p className="mensagem-vazia">{erro}</p>;
+
+  return (
+    <div className="pagina">
+      <CotacaoForm
+        cotacaoEditando={cotacao}
+        onSalvar={salvar}
+        onCancelar={() => navigate('/cotacoes')}
+      />
+    </div>
+  );
+}
+
+function ListaCotacoes() {
   const [cotacoes, setCotacoes] = useState([]);
   const [config, setConfig] = useState({});
   const [aeroportos, setAeroportos] = useState([]);
   const [fornecedores, setFornecedores] = useState([]);
   const [contagens, setContagens] = useState({});
-  const [aba, setAba] = useState('elaboracao');
+  const navigate = useNavigate();
+  const [parametros, setParametros] = useSearchParams();
+
+  // A aba fica na URL para o F5 não perder o lugar, mas sem encher o histórico
+  const aba = parametros.get('situacao') || 'elaboracao';
+  const setAba = (valor) => setParametros({ situacao: valor }, { replace: true });
   const [busca, setBusca] = useState('');
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
-  const [modo, setModo] = useState('lista');
-  const [cotacaoEditando, setCotacaoEditando] = useState(null);
+
 
   useEffect(() => {
     buscarConfiguracoes().then(setConfig).catch(() => {});
@@ -323,17 +371,6 @@ export default function Cotacoes() {
     return () => clearTimeout(timeout);
   }, [carregar]);
 
-  async function salvar(dados) {
-    if (cotacaoEditando) {
-      await editarCotacao(cotacaoEditando.id, dados);
-    } else {
-      await criarCotacao(dados);
-    }
-    setModo('lista');
-    setCotacaoEditando(null);
-    carregar();
-  }
-
   async function mudarStatus(cotacao, status) {
     try {
       await alterarStatus(cotacao.id, status);
@@ -358,21 +395,6 @@ export default function Cotacoes() {
     }
   }
 
-  if (modo === 'form') {
-    return (
-      <div className="pagina">
-        <CotacaoForm
-          cotacaoEditando={cotacaoEditando}
-          onSalvar={salvar}
-          onCancelar={() => {
-            setModo('lista');
-            setCotacaoEditando(null);
-          }}
-        />
-      </div>
-    );
-  }
-
   const visiveis = cotacoes.filter((c) => c.status === aba);
 
   return (
@@ -387,10 +409,7 @@ export default function Cotacoes() {
         />
         <button
           className="btn btn-primario"
-          onClick={() => {
-            setCotacaoEditando(null);
-            setModo('form');
-          }}
+          onClick={() => navigate('/cotacoes/nova')}
         >
           + Nova cotação
         </button>
@@ -425,10 +444,7 @@ export default function Cotacoes() {
               aeroportos={aeroportos}
               fornecedores={fornecedores}
               onAtualizar={carregar}
-              onEditar={(c) => {
-                setCotacaoEditando(c);
-                setModo('form');
-              }}
+              onEditar={(c) => navigate(`/cotacoes/${c.id}/editar`)}
               onStatus={mudarStatus}
               onExcluir={handleExcluir}
             />
@@ -436,5 +452,15 @@ export default function Cotacoes() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function Cotacoes() {
+  return (
+    <Routes>
+      <Route path="/" element={<ListaCotacoes />} />
+      <Route path="nova" element={<FormularioCotacao novo />} />
+      <Route path=":id/editar" element={<FormularioCotacao />} />
+    </Routes>
   );
 }
